@@ -1,6 +1,5 @@
-from fastapi import APIRouter, Request, HTTPException, Depends
+from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import Response
-from fastapi.security import OAuth2PasswordBearer
 import httpx
 import os
 from jose import jwt, JWTError
@@ -19,32 +18,30 @@ SERVICES = {
     "orbitbet": os.getenv("ORBITBET_SERVICE_URL", "http://orbitbet-service:8000"),
 }
 
-# Routes that do NOT require authentication
 PUBLIC_ROUTES = [
     "/api/auth/register",
     "/api/auth/login",
     "/health",
 ]
 
-def get_service_for_path(path: str) -> tuple[str, str]:
-    """Returns (service_url, forwarded_path)"""
+def get_service_for_path(path: str) -> str:
     if path.startswith("/api/auth"):
-        return SERVICES["auth"], path
+        return SERVICES["auth"]
     if path.startswith("/api/wallet"):
-        return SERVICES["wallet"], path
+        return SERVICES["wallet"]
     if path.startswith("/api/prices") or \
        path.startswith("/api/orders") or \
        path.startswith("/api/trades") or \
        path.startswith("/api/peter"):
-        return SERVICES["trading"], path
+        return SERVICES["trading"]
     if path.startswith("/api/arb"):
-        return SERVICES["arb"], path
+        return SERVICES["arb"]
     if path.startswith("/api/leaderboard") or \
        path.startswith("/api/follow") or \
        path.startswith("/api/copy"):
-        return SERVICES["follow"], path
+        return SERVICES["follow"]
     if path.startswith("/api/bet"):
-        return SERVICES["orbitbet"], path
+        return SERVICES["orbitbet"]
     raise HTTPException(status_code=404, detail="Route not found")
 
 
@@ -60,13 +57,14 @@ def extract_user_id(token: str) -> str:
 
 
 @router.api_route(
-    "/api/{full_path:path}",
+    "/{full_path:path}",
     methods=["GET", "POST", "PUT", "DELETE", "PATCH"]
 )
 async def proxy(request: Request, full_path: str):
-    path = f"/api/{full_path}"
+    # Reconstruct full path
+    path = "/" + full_path
 
-    # Check if route is public
+    # Check if public
     is_public = any(path.startswith(pub) for pub in PUBLIC_ROUTES)
 
     headers = dict(request.headers)
@@ -82,27 +80,26 @@ async def proxy(request: Request, full_path: str):
         headers["x-user-id"] = user_id
 
     # Get target service
-    service_url, forward_path = get_service_for_path(path)
-    target_url = f"{service_url}{forward_path}"
+    service_url = get_service_for_path(path)
+    target_url  = f"{service_url}{path}"
 
     # Add query params
     if request.query_params:
         target_url += f"?{request.query_params}"
 
-    # Forward request
     body = await request.body()
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.request(
-            method=request.method,
-            url=target_url,
-            headers=headers,
-            content=body,
+            method  = request.method,
+            url     = target_url,
+            headers = headers,
+            content = body,
         )
 
     return Response(
-        content=response.content,
-        status_code=response.status_code,
-        headers=dict(response.headers),
-        media_type=response.headers.get("content-type"),
+        content    = response.content,
+        status_code= response.status_code,
+        headers    = dict(response.headers),
+        media_type = response.headers.get("content-type"),
     )
