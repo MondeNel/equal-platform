@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from passlib.context import CryptContext
+import bcrypt
 from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from typing import Optional
@@ -18,16 +18,15 @@ SECRET_KEY   = os.getenv("AUTH_SECRET_KEY", "change-me")
 ALGORITHM    = "HS256"
 TOKEN_EXPIRE = timedelta(days=30)
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 def hash_password(plain: str) -> str:
-    return pwd_context.hash(plain)
+    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 def create_token(user_id: str) -> str:
     return jwt.encode(
