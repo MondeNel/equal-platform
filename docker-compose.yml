@@ -1,0 +1,194 @@
+services:
+
+  # ── Databases ──────────────────────────────────────────────────────────────
+  auth-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: auth_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - auth-db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U equal -d auth_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  wallet-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: wallet_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - wallet-db-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U equal -d wallet_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  trading-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: trading_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - trading-db-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U equal -d trading_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  arb-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: arb_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - arb-db-data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U equal -d arb_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  follow-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: follow_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - follow-db-data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U equal -d follow_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  orbitbet-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: orbitbet_db
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - orbitbet-db-data:/var/lib/postgresql/data
+    ports:
+      - "5437:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U equal -d orbitbet_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── Backend Services ───────────────────────────────────────────────────────
+  gateway:
+    build: ./services/gateway
+    ports:
+      - "8000:8000"
+    env_file: .env
+    depends_on:
+      auth-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  auth-service:
+    build: ./services/auth-service
+    ports:
+      - "8001:8000"
+    env_file: .env
+    depends_on:
+      auth-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  wallet-service:
+    build: ./services/wallet-service
+    ports:
+      - "8002:8000"
+    env_file: .env
+    depends_on:
+      wallet-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  trading-service:
+    build: ./services/trading-service
+    ports:
+      - "8003:8000"
+    env_file: .env
+    depends_on:
+      trading-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  arb-service:
+    build: ./services/arbitrage-service
+    ports:
+      - "8004:8000"
+    env_file: .env
+    depends_on:
+      arb-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  follow-service:
+    build: ./services/follow-service
+    ports:
+      - "8005:8000"
+    env_file: .env
+    depends_on:
+      follow-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  orbitbet-service:
+    build: ./services/orbitbet-service
+    ports:
+      - "8006:8000"
+    env_file: .env
+    depends_on:
+      orbitbet-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  auth-db-data:
+  wallet-db-data:
+  trading-db-data:
+  arb-db-data:
+  follow-db-data:
+  orbitbet-db-data:
