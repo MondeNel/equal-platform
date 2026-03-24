@@ -1,3 +1,19 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* src/index.css */
+@import "tailwindcss";
+
+@keyframes glow-blue { 
+  0%, 100% { box-shadow: 0 0 8px #00d4ff44; }  
+  50% { box-shadow: 0 0 18px #00d4ff88; } 
+}
+
+@keyframes pulse { 
+  0%, 100% { opacity: 1; } 
+  50% { opacity: 0.3; } 
+}
+
+/* Apply the custom font and background from the blueprint */
+body {
+  background-color: #07080f;
+  font-family: 'Courier New', monospace;
+  margin: 0;
+}
