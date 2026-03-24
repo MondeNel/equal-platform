@@ -1,252 +1,245 @@
-import { useState, useEffect } from 'react';
-import { betAPI } from '../api';
+import { useState, useEffect } from "react";
+import { betAPI } from "../api";
 
+/**
+ * BetPage component allows authenticated users to view markets, place bets,
+ * and watch a live price orbit simulation.
+ */
 export default function BetPage() {
-  const [markets, setMarkets] = useState(null);
-  const [selectedMarket, setSelectedMarket] = useState('Crypto');
-  const [selectedSymbol, setSelectedSymbol] = useState('BTC/USD');
-  const [currentPrice, setCurrentPrice] = useState(110.00);
-  const [priceHistory, setPriceHistory] = useState([110, 110, 110]);
-  const [stake, setStake] = useState(100);
+  const [markets, setMarkets] = useState([]);
+  const [selectedMarket, setSelectedMarket] = useState("Crypto");
+  const [selectedSymbol, setSelectedSymbol] = useState("BTC/USD");
+  const [currentPrice, setCurrentPrice] = useState(110.0);
+  const [priceHistory, setPriceHistory] = useState([110, 110, 110, 110, 110, 110]);
+  const [stake, setStake] = useState(50);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  // Load markets on mount
+  // --- TOKEN FROM URL (for micro-frontend navigation) ---
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+
+    if (token) {
+      localStorage.setItem("equal_token", token);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, []);
+
+  // --- AUTH CHECK ---
+  useEffect(() => {
+    const token = localStorage.getItem("equal_token");
+    if (!token) {
+      window.location.href = "http://localhost:5171/login";
+    }
+  }, []);
+
+  // --- LOAD MARKETS ---
   useEffect(() => {
     async function fetchMarkets() {
       try {
-        const res = await betAPI.get('/markets');
-        setMarkets(res.data.markets);
-      } catch (err) {
-        setError('Failed to load markets');
+        const res = await betAPI.get("/markets");
+        setMarkets(res.data.markets || []);
+      } catch {
+        setError("Failed to load markets");
       }
     }
     fetchMarkets();
   }, []);
 
-  // Simulate price movement
+  // --- SIMULATE PRICE MOVEMENT ---
   useEffect(() => {
     const interval = setInterval(() => {
       const change = (Math.random() - 0.5) * 4;
-      setCurrentPrice(prev => Math.max(50, Math.min(200, prev + change)));
-      setPriceHistory(prev => [...prev.slice(1), currentPrice + change]);
+      setCurrentPrice((prev) => {
+        const newPrice = Math.max(50, Math.min(200, prev + change));
+        setPriceHistory((prevHistory) => [...prevHistory.slice(1), newPrice]);
+        return newPrice;
+      });
     }, 1000);
     return () => clearInterval(interval);
-  }, [currentPrice]);
+  }, []);
 
-  const currentMarketSymbols = markets?.find(m => m.id === selectedMarket)?.symbols || [];
+  const currentMarketSymbols =
+    markets.find((m) => m.id === selectedMarket)?.symbols || [];
 
-  // Update symbol when market changes
+  // --- KEEP SYMBOL IN SYNC WITH MARKET ---
   useEffect(() => {
-    if (currentMarketSymbols.length > 0 && !currentMarketSymbols.includes(selectedSymbol)) {
+    if (
+      currentMarketSymbols.length > 0 &&
+      !currentMarketSymbols.includes(selectedSymbol)
+    ) {
       setSelectedSymbol(currentMarketSymbols[0]);
     }
-  }, [currentMarketSymbols, selectedSymbol]);
+  }, [currentMarketSymbols]);
 
+  // --- HANDLE BET ---
   async function handleBet(direction) {
-    if (!localStorage.getItem('equal_token')) {
-      window.location.href = 'http://localhost:5171';
-      return;
-    }
-
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
     setLoading(true);
 
     try {
-      const res = await betAPI.post('/place', {
+      await betAPI.post("/place", {
         symbol: selectedSymbol,
         stake: parseFloat(stake),
         direction: direction,
       });
+
       setSuccess(`Bet placed! ${direction} on ${selectedSymbol}`);
-      setStake(100);
-      setTimeout(() => setSuccess(''), 3000);
+      setStake(50);
+
+      setTimeout(() => setSuccess(""), 3000);
     } catch (err) {
-      const msg = err.response?.data?.detail || 'Failed to place bet';
+      const msg = err.response?.data?.detail || "Failed to place bet";
       setError(msg);
     } finally {
       setLoading(false);
     }
   }
 
-  // Calculate gauge angle based on price position (0-180 degrees)
   const minPrice = 50;
   const maxPrice = 200;
   const pricePercent = (currentPrice - minPrice) / (maxPrice - minPrice);
-  const gaugeAngle = pricePercent * 180 - 90; // -90 to 90
-
-  const marketOptions = markets?.map(m => m.id) || [];
 
   return (
-    <div style={{ minHeight: "100vh", background: "#05050e", display: "flex", flexDirection: "column", padding: "16px", paddingBottom: "120px" }}>
-      
-      {/* Header with prices */}
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "16px", fontSize: "12px", color: "#5050a0" }}>
-        <span>ZAR <span style={{ fontSize: "14px", color: "#c8c8ee", fontWeight: "bold" }}>110.00</span></span>
-        <span>ZAR <span style={{ fontSize: "14px", color: "#c8c8ee", fontWeight: "bold" }}>68.00</span></span>
+    <div className="min-h-screen bg-[#05050e] px-4 pb-32 flex flex-col items-center text-[#c8c8ee]">
+      {/* Header */}
+      <div className="w-full flex justify-between text-xs text-[#5050a0] mb-4">
+        <span>
+          ZAR <span className="text-[#0de74a] font-bold">110.00</span>
+        </span>
+        <span>
+          ZAR <span className="text-[#0de74a] font-bold">60.00</span>
+        </span>
       </div>
 
-      {/* Market and Symbol Selection */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", marginBottom: "16px" }}>
+      {/* Market & Symbol */}
+      <div className="w-full grid grid-cols-2 gap-2 mb-4">
         <select
           value={selectedMarket}
           onChange={(e) => {
-            setSelectedMarket(e.target.value);
-            const symbols = markets?.find(m => m.id === e.target.value)?.symbols || [];
-            setSelectedSymbol(symbols[0]);
+            const market = e.target.value;
+            setSelectedMarket(market);
+
+            const symbols =
+              markets.find((m) => m.id === market)?.symbols || [];
+            if (symbols.length > 0) {
+              setSelectedSymbol(symbols[0]);
+            }
           }}
-          style={{
-            background: "#0d0820",
-            border: "1px solid #2e2e58",
-            borderRadius: "8px",
-            padding: "10px",
-            color: "#c8c8ee",
-            fontSize: "12px",
-            cursor: "pointer",
-          }}
+          className="bg-[#0d0820] border border-[#2e2e58] rounded-lg p-2 text-sm text-[#c8c8ee] cursor-pointer"
         >
-          {marketOptions.map(m => (
-            <option key={m} value={m}>{m}</option>
+          {markets.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.id}
+            </option>
           ))}
         </select>
 
         <select
           value={selectedSymbol}
           onChange={(e) => setSelectedSymbol(e.target.value)}
-          style={{
-            background: "#0d0820",
-            border: "1px solid #2e2e58",
-            borderRadius: "8px",
-            padding: "10px",
-            color: "#c8c8ee",
-            fontSize: "12px",
-            cursor: "pointer",
-          }}
+          className="bg-[#0d0820] border border-[#2e2e58] rounded-lg p-2 text-sm text-[#c8c8ee] cursor-pointer"
         >
-          {currentMarketSymbols.map(s => (
-            <option key={s} value={s}>{s}</option>
+          {currentMarketSymbols.map((s) => (
+            <option key={s} value={s}>
+              {s}
+            </option>
           ))}
         </select>
       </div>
 
       {/* Price Display */}
-      <div style={{ textAlign: "center", marginBottom: "24px" }}>
-        <div style={{ fontSize: "11px", color: "#5050a0", letterSpacing: "1px", marginBottom: "4px" }}>
-          {selectedSymbol}
+      <div className="text-center mb-6">
+        <div className="text-[11px] text-[#5050a0] tracking-widest mb-1">
+          {selectedSymbol} • LIVE PRICE
         </div>
-        <div style={{ fontSize: "28px", fontWeight: "bold", color: "#facc15" }}>
-          {currentPrice.toFixed(2)}
+        <div className="text-3xl font-bold text-yellow-400 flex justify-center gap-1">
+          {currentPrice
+            .toFixed(2)
+            .split("")
+            .map((digit, idx) => (
+              <span
+                key={idx}
+                className="px-1 border border-[#3b3b5c] rounded"
+              >
+                {digit}
+              </span>
+            ))}
+        </div>
+        <div className="text-xs text-green-400 mt-1">▲ 0.0038 LIVE</div>
+      </div>
+
+      {/* Probability Orbit */}
+      <div className="relative w-40 h-40 mb-6">
+        <div className="absolute inset-0 rounded-full border border-[#2e2e58] flex items-center justify-center">
+          <div className="w-6 h-6 bg-[#0d0820] rounded-full animate-bounce"></div>
+        </div>
+        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 flex gap-2 text-xs text-[#5050a0]">
+          <span>r1</span>
+          <span>r2</span>
+          <span>r3</span>
         </div>
       </div>
 
-      {/* Circular Gauge */}
-      <div style={{ display: "flex", justifyContent: "center", margin: "20px 0" }}>
-        <svg width="160" height="100" viewBox="0 0 160 100" style={{ position: "relative" }}>
-          {/* Gauge arc background */}
-          <circle cx="80" cy="90" r="50" fill="none" stroke="#1e1e3a" strokeWidth="2" />
-          
-          {/* Gauge arc filled */}
-          <circle
-            cx="80"
-            cy="90"
-            r="50"
-            fill="none"
-            stroke="#3b82f6"
-            strokeWidth="2"
-            strokeDasharray={`${(pricePercent * 155.0)} 155.0`}
-            style={{ transform: "rotate(-90deg)", transformOrigin: "80px 90px" }}
-          />
-          
-          {/* Needle */}
-          <g style={{ transform: `rotate(${gaugeAngle}deg)`, transformOrigin: "80px 90px", transition: "transform 0.3s ease" }}>
-            <line x1="80" y1="90" x2="80" y2="45" stroke="#facc15" strokeWidth="2" />
-            <circle cx="80" cy="90" r="3" fill="#facc15" />
-          </g>
-          
-          {/* Min/Max labels */}
-          <text x="35" y="95" fontSize="10" fill="#5050a0">50</text>
-          <text x="125" y="95" fontSize="10" fill="#5050a0">200</text>
-        </svg>
-      </div>
-
-      {/* Price ticker display */}
-      <div style={{ background: "#0d0820", border: "1px solid #2e2e58", borderRadius: "8px", padding: "8px", marginBottom: "20px", textAlign: "center" }}>
-        <div style={{ display: "flex", justifyContent: "center", gap: "8px", fontSize: "16px", fontWeight: "bold", color: "#facc15", letterSpacing: "2px" }}>
-          {priceHistory.map((p, i) => (
-            <span key={i}>{Math.floor(p)}</span>
-          ))}
-        </div>
-        <div style={{ fontSize: "9px", color: "#5050a0", marginTop: "4px" }}>
-          R 4.5 • 0.09% • 1.1%
-        </div>
-      </div>
-
-      {/* Stake Input */}
-      <div style={{ marginBottom: "20px" }}>
-        <label style={{ fontSize: "11px", color: "#5050a0", letterSpacing: "1px", display: "block", marginBottom: "6px" }}>
+      {/* Stake */}
+      <div className="w-full mb-4">
+        <label className="block text-[11px] text-[#5050a0] mb-1">
           STAKE AMOUNT
         </label>
-        <input
-          type="number"
-          value={stake}
-          onChange={(e) => setStake(e.target.value)}
-          style={{
-            width: "100%",
-            background: "#0d0820",
-            border: "1px solid #2e2e58",
-            borderRadius: "8px",
-            padding: "10px",
-            color: "#c8c8ee",
-            fontSize: "14px",
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setStake((s) => Math.max(1, Number(s) - 1))}
+            className="bg-[#0d0820] border border-[#2e2e58] rounded-lg w-10 h-10 text-[#c8c8ee]"
+          >
+            -
+          </button>
+          <input
+            type="number"
+            value={stake}
+            onChange={(e) => setStake(e.target.value)}
+            className="bg-[#0d0820] border border-[#2e2e58] rounded-lg p-2 w-full text-center text-[#c8c8ee]"
+          />
+          <button
+            onClick={() => setStake((s) => Number(s) + 1)}
+            className="bg-[#0d0820] border border-[#2e2e58] rounded-lg w-10 h-10 text-[#c8c8ee]"
+          >
+            +
+          </button>
+        </div>
       </div>
 
-      {/* Error/Success Messages */}
-      {error && <div style={{ background: "#7f1d1d", border: "1px solid #991b1b", borderRadius: "6px", padding: "10px", marginBottom: "12px", fontSize: "12px", color: "#fecaca" }}>{error}</div>}
-      {success && <div style={{ background: "#064e3b", border: "1px solid #047857", borderRadius: "6px", padding: "10px", marginBottom: "12px", fontSize: "12px", color: "#86efac" }}>{success}</div>}
+      {/* Error / Success */}
+      {error && (
+        <div className="bg-red-900 border border-red-700 text-red-200 rounded-md p-2 mb-2 text-xs w-full text-center">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="bg-green-900 border border-green-700 text-green-300 rounded-md p-2 mb-2 text-xs w-full text-center">
+          {success}
+        </div>
+      )}
 
-      {/* Up/Down Buttons */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+      {/* Up / Down Buttons */}
+      <div className="w-full grid grid-cols-2 gap-2">
         <button
           onClick={() => handleBet("UP")}
           disabled={loading}
-          style={{
-            background: "#047857",
-            border: "1px solid #10b981",
-            borderRadius: "8px",
-            padding: "14px",
-            color: "#10b981",
-            fontWeight: "bold",
-            fontSize: "14px",
-            letterSpacing: "1px",
-            cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading ? 0.6 : 1,
-            transition: "all 0.2s",
-          }}
-          onMouseEnter={(e) => !loading && (e.target.style.background = "#059669")}
-          onMouseLeave={(e) => !loading && (e.target.style.background = "#047857")}
+          className="bg-green-700 border border-green-500 text-green-200 font-bold py-3 rounded-lg hover:bg-green-600 disabled:opacity-50"
         >
           ▲ UP
         </button>
         <button
           onClick={() => handleBet("DOWN")}
           disabled={loading}
-          style={{
-            background: "#7f1d1d",
-            border: "1px solid #f87171",
-            borderRadius: "8px",
-            padding: "14px",
-            color: "#f87171",
-            fontWeight: "bold",
-            fontSize: "14px",
-            letterSpacing: "1px",
-            cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading ? 0.6 : 1,
-            transition: "all 0.2s",
-          }}
-          onMouseEnter={(e) => !loading && (e.target.style.background = "#991b1b")}
-          onMouseLeave={(e) => !loading && (e.target.style.background = "#7f1d1d")}
-        
+          className="bg-red-700 border border-red-500 text-red-300 font-bold py-3 rounded-lg hover:bg-red-600 disabled:opacity-50"
+        >
+          ▼ DOWN
+        </button>
+      </div>
+    </div>
+  );
+}

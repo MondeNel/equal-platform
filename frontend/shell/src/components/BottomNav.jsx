@@ -1,3 +1,11 @@
+import { useEffect, useState } from "react";
+
+/**
+ * Bottom navigation shared across micro-frontends.
+ * Handles:
+ * - Active tab state
+ * - Cross-app navigation with token + tab
+ */
 const TABS = [
   { id: "bet",     label: "BET",     route: "http://localhost:5175", color: "#f97316" },
   { id: "trade",   label: "TRADE",   route: "http://localhost:5172", color: "#4ade80" },
@@ -20,9 +28,9 @@ const ICONS = {
   ),
   arb: (a) => (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-      <circle cx="4"  cy="9" r="2.5" stroke={a ? "#facc15" : "#3a3a60"} strokeWidth="1.3"/>
+      <circle cx="4" cy="9" r="2.5" stroke={a ? "#facc15" : "#3a3a60"} strokeWidth="1.3"/>
       <circle cx="14" cy="9" r="2.5" stroke={a ? "#facc15" : "#3a3a60"} strokeWidth="1.3"/>
-      <line x1="6.5" y1="7.5" x2="11.5" y2="6"  stroke={a ? "#facc15" : "#3a3a60"} strokeWidth="1" strokeDasharray="2,1.5"/>
+      <line x1="6.5" y1="7.5" x2="11.5" y2="6" stroke={a ? "#facc15" : "#3a3a60"} strokeWidth="1" strokeDasharray="2,1.5"/>
       <line x1="6.5" y1="10.5" x2="11.5" y2="12" stroke={a ? "#facc15" : "#3a3a60"} strokeWidth="1" strokeDasharray="2,1.5"/>
     </svg>
   ),
@@ -42,7 +50,27 @@ const ICONS = {
   ),
 };
 
-export default function BottomNav({ active = "home", setActive }) {
+export default function BottomNav({ active }) {
+  const [currentTab, setCurrentTab] = useState(active || "bet");
+
+  useEffect(() => {
+    if (!active) {
+      const stored = localStorage.getItem("active_tab");
+      if (stored) setCurrentTab(stored);
+    } else {
+      setCurrentTab(active);
+    }
+  }, [active]);
+
+  function handleNav(tab) {
+    const token = localStorage.getItem("equal_token");
+
+    // Persist active tab across apps
+    localStorage.setItem("active_tab", tab.id);
+
+    window.location.href = `${tab.route}?token=${token}&tab=${tab.id}`;
+  }
+
   return (
     <div style={{
       position: "fixed", bottom: 0, left: "50%",
@@ -56,11 +84,12 @@ export default function BottomNav({ active = "home", setActive }) {
       gridTemplateColumns: "repeat(5, 1fr)",
     }}>
       {TABS.map(tab => {
-        const isActive = active === tab.id;
+        const isActive = currentTab === tab.id;
+
         return (
           <div
             key={tab.id}
-            onClick={() => setActive?.(tab.id)}  // <- updated
+            onClick={() => handleNav(tab)}
             style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "8px 4px", cursor: "pointer", position: "relative" }}
           >
             <div style={{
@@ -72,15 +101,25 @@ export default function BottomNav({ active = "home", setActive }) {
             }}>
               {ICONS[tab.id](isActive)}
             </div>
+
             <span style={{
-              fontSize: "7px", letterSpacing: "0.5px",
+              fontSize: "7px",
+              letterSpacing: "0.5px",
               color: isActive ? tab.color : "#3a3a60",
               fontWeight: isActive ? "bold" : "normal",
             }}>
               {tab.label}
             </span>
+
             {isActive && (
-              <div style={{ position: "absolute", bottom: 0, width: "20px", height: "2px", background: tab.color, borderRadius: "1px" }} />
+              <div style={{
+                position: "absolute",
+                bottom: 0,
+                width: "20px",
+                height: "2px",
+                background: tab.color,
+                borderRadius: "1px"
+              }} />
             )}
           </div>
         );
