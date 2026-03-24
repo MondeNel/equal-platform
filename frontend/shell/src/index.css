@@ -1,0 +1,28 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: #05050e;
+  color: #e8e8ff;
+  font-family: 'Courier New', monospace;
+  min-height: 100vh;
+}
+
+#root {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: #05050e;
+  position: relative;
+}
+
+input, button, select {
+  font-family: 'Courier New', monospace;
+}
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #05050e; }
+::-webkit-scrollbar-thumb { background: #2e2e58; border-radius: 2px; }
