@@ -3,11 +3,8 @@ import RegisterPage from "./pages/RegisterPage";
 import LoginPage    from "./pages/LoginPage";
 
 function PublicRoute({ children }) {
-  const token = localStorage.getItem("equal_token");
-  if (token) {
-    window.location.href = "http://localhost:5170";
-    return null;
-  }
+  // User is logged in but on auth pages - just show the page
+  // (we'll handle navigation to shell later when shell is ready)
   return children;
 }
 

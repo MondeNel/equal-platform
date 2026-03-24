@@ -83,7 +83,11 @@ export default function RegisterPage() {
       const me = await authAPI.me();
       localStorage.setItem("equal_user", JSON.stringify(me.data));
 
-      window.location.href = "http://localhost:5170";
+      // Redirect to shell with token in URL
+      setTimeout(() => {
+        const shellUrl = `http://${window.location.hostname}:5170?token=${login.data.access_token}`;
+        window.location.href = shellUrl;
+      }, 500);
     } catch (e) {
       const detail = e.response?.data?.detail;
       const msg = Array.isArray(detail)

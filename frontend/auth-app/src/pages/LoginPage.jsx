@@ -8,9 +8,11 @@ export default function LoginPage() {
   const [showPass, setShowPass] = useState(false);
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState("");
+  const [success,  setSuccess]  = useState(false);
 
   async function handleLogin() {
     setError("");
+    setSuccess(false);
     if (!email.trim())    return setError("Enter your email.");
     if (!password.trim()) return setError("Enter your password.");
 
@@ -22,7 +24,11 @@ export default function LoginPage() {
       const me = await authAPI.me();
       localStorage.setItem("equal_user", JSON.stringify(me.data));
 
-      window.location.href = "http://localhost:5170";
+      // Redirect to shell with token in URL
+      setTimeout(() => {
+        const shellUrl = `http://${window.location.hostname}:5170?token=${res.data.access_token}`;
+        window.location.href = shellUrl;
+      }, 500);
     } catch (e) {
       setError(e.response?.data?.detail || "Invalid email or password.");
     } finally {
@@ -46,6 +52,9 @@ export default function LoginPage() {
 
         {/* Error */}
         {error && <div style={styles.errorBanner}>{error}</div>}
+
+        {/* Success */}
+        {success && <div style={{...styles.errorBanner, background: "#10b981", borderColor: "#059669"}}>✓ Login successful! Token saved.</div>}
 
         {/* Form card */}
         <div style={styles.card}>
