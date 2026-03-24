@@ -42,7 +42,7 @@ const ICONS = {
   ),
 };
 
-export default function BottomNav({ active = "home" }) {
+export default function BottomNav({ active = "home", setActive }) {
   return (
     <div style={{
       position: "fixed", bottom: 0, left: "50%",
@@ -60,7 +60,7 @@ export default function BottomNav({ active = "home" }) {
         return (
           <div
             key={tab.id}
-            onClick={() => window.location.href = tab.route}
+            onClick={() => setActive?.(tab.id)}  // <- updated
             style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "4px", padding: "8px 4px", cursor: "pointer", position: "relative" }}
           >
             <div style={{

@@ -1,15 +1,28 @@
 import { useState, useEffect } from "react";
 import BottomNav from "../components/BottomNav";
 
+/**
+ * SimCounter simulates a live counter with small random fluctuations.
+ * @param {number} base - Starting value.
+ * @param {number} step - Maximum fluctuation per interval.
+ * @param {number} interval - Update interval in ms.
+ */
 function SimCounter({ base, step = 3, interval = 900 }) {
   const [val, setVal] = useState(base);
+
   useEffect(() => {
-    const id = setInterval(() => setVal(v => v + Math.floor(Math.random() * step * 2) - Math.floor(step * 0.4)), interval);
+    const id = setInterval(() => {
+      setVal(v => v + Math.floor(Math.random() * step * 2) - Math.floor(step * 0.4));
+    }, interval);
     return () => clearInterval(id);
-  }, []);
+  }, [step, interval]);
+
   return <span>{val.toLocaleString()}</span>;
 }
 
+/**
+ * TypingSlogan displays a two-line animated typing effect.
+ */
 function TypingSlogan() {
   const text = "COMPLEXITY IS THE ENEMY OF EXECUTION";
   const [displayedText, setDisplayedText] = useState("");
@@ -20,17 +33,14 @@ function TypingSlogan() {
       if (index < text.length) {
         setDisplayedText(text.slice(0, index + 1));
         index++;
-      } else {
-        clearInterval(timer);
-      }
+      } else clearInterval(timer);
     }, 50);
     return () => clearInterval(timer);
   }, []);
 
-  // Split text into lines at "ENEMY OF"
-  const lines = displayedText.split(" ");
-  const firstLine = lines.slice(0, 4).join(" "); // "COMPLEXITY IS THE ENEMY"
-  const secondLine = lines.slice(4).join(" "); // "OF EXECUTION"
+  const words = displayedText.split(" ");
+  const firstLine = words.slice(0, 4).join(" ");
+  const secondLine = words.slice(4).join(" ");
 
   return (
     <>
@@ -44,6 +54,9 @@ function TypingSlogan() {
   );
 }
 
+/**
+ * LandingPage displays the main shell content without any auth forms.
+ */
 export default function LandingPage() {
   return (
     <div style={{ minHeight: "100vh", background: "#05050e", display: "flex", flexDirection: "column" }}>
@@ -65,22 +78,26 @@ export default function LandingPage() {
               <stop offset="100%" stopColor="#0ea5c8"/>
             </linearGradient>
           </defs>
-          <text x="0" y="36" fontFamily="Arial, Helvetica, sans-serif" fontSize="40" fontWeight="900" fill="url(#eg)" letterSpacing="0">e</text>
-          <text x="28" y="36" fontFamily="Arial, Helvetica, sans-serif" fontSize="40" fontWeight="900" fill="#e8e8ff" letterSpacing="0">Q</text>
-          <text x="62" y="36" fontFamily="Arial, Helvetica, sans-serif" fontSize="40" fontWeight="900" fill="#c8c8ee" letterSpacing="0">ual</text>
+          <text x="0" y="36" fontFamily="Arial, Helvetica, sans-serif" fontSize="40" fontWeight="900" fill="url(#eg)">e</text>
+          <text x="28" y="36" fontFamily="Arial, Helvetica, sans-serif" fontSize="40" fontWeight="900" fill="#e8e8ff">Q</text>
+          <text x="62" y="36" fontFamily="Arial, Helvetica, sans-serif" fontSize="40" fontWeight="900" fill="#c8c8ee">ual</text>
         </svg>
 
-        {/* Slogan with typing animation */}
+        {/* Slogan */}
         <TypingSlogan />
 
         {/* Live stats */}
         <div style={{ width: "100%", background: "#0d0820", border: "1px solid #2e2e58", borderRadius: "10px", padding: "12px 16px", display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "24px" }}>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: "18px", fontWeight: "bold", color: "#4ade80", letterSpacing: "1px" }}><SimCounter base={1247} step={5} interval={800} /></div>
+            <div style={{ fontSize: "18px", fontWeight: "bold", color: "#4ade80", letterSpacing: "1px" }}>
+              <SimCounter base={1247} step={5} interval={800} />
+            </div>
             <div style={{ fontSize: "9px", color: "#5050a0", letterSpacing: "1px", marginTop: "2px" }}>ACTIVE TRADERS</div>
           </div>
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: "18px", fontWeight: "bold", color: "#facc15", letterSpacing: "1px" }}>R<SimCounter base={2400000} step={100000} interval={1000} /></div>
+            <div style={{ fontSize: "18px", fontWeight: "bold", color: "#facc15", letterSpacing: "1px" }}>
+              R<SimCounter base={2400000} step={100000} interval={1000} />
+            </div>
             <div style={{ fontSize: "9px", color: "#5050a0", letterSpacing: "1px", marginTop: "2px" }}>TODAY'S VOLUME</div>
           </div>
           <div style={{ textAlign: "center" }}>
@@ -89,8 +106,9 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Peter AI alert card */}
-        <div style={{ width: "100%", background: "#0a0820", border: "1px solid #a78bfa44", borderRadius: "10px", padding: "12px 16px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer" }} onClick={() => window.location.href = "http://localhost:5172"}>
+        {/* AI Alert card */}
+        <div style={{ width: "100%", background: "#0a0820", border: "1px solid #a78bfa44", borderRadius: "10px", padding: "12px 16px", display: "flex", alignItems: "center", gap: "12px", cursor: "pointer" }}
+             onClick={() => window.location.href = "http://localhost:5172"}>
           <div style={{ width: "36px", height: "36px", borderRadius: "50%", background: "linear-gradient(135deg,#3b0764,#6d28d9)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, fontSize: "12px", fontWeight: "bold", color: "#ddd6fe" }}>AI</div>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: "10px", color: "#a78bfa", letterSpacing: "1px", marginBottom: "2px" }}>PETER · JUST NOW</div>
