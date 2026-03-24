@@ -2,40 +2,33 @@ import { useState, useEffect } from "react";
 import { betAPI } from "../api";
 
 /**
- * BetPage component allows authenticated users to view markets, place bets,
- * and watch a live price orbit simulation.
+ * BetPage - Mobile-first responsive version
  */
 export default function BetPage() {
   const [markets, setMarkets] = useState([]);
   const [selectedMarket, setSelectedMarket] = useState("Crypto");
   const [selectedSymbol, setSelectedSymbol] = useState("BTC/USD");
-  const [currentPrice, setCurrentPrice] = useState(110.0);
-  const [priceHistory, setPriceHistory] = useState([110, 110, 110, 110, 110, 110]);
+  const [currentPrice, setCurrentPrice] = useState(674321);
+  const [priceHistory, setPriceHistory] = useState([6, 7, 4, 3, 2, 1]);
   const [stake, setStake] = useState(50);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // --- TOKEN FROM URL (for micro-frontend navigation) ---
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
-
     if (token) {
       localStorage.setItem("equal_token", token);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
-  // --- AUTH CHECK ---
   useEffect(() => {
     const token = localStorage.getItem("equal_token");
-    if (!token) {
-      window.location.href = "http://localhost:5171/login";
-    }
+    if (!token) window.location.href = "http://localhost:5171/login";
   }, []);
 
-  // --- LOAD MARKETS ---
   useEffect(() => {
     async function fetchMarkets() {
       try {
@@ -48,23 +41,21 @@ export default function BetPage() {
     fetchMarkets();
   }, []);
 
-  // --- SIMULATE PRICE MOVEMENT ---
   useEffect(() => {
     const interval = setInterval(() => {
-      const change = (Math.random() - 0.5) * 4;
+      const change = Math.floor((Math.random() - 0.5) * 10);
       setCurrentPrice((prev) => {
-        const newPrice = Math.max(50, Math.min(200, prev + change));
-        setPriceHistory((prevHistory) => [...prevHistory.slice(1), newPrice]);
+        const newPrice = Math.max(100000, prev + change);
+        setPriceHistory(newPrice.toString().slice(-6).split("").map(Number));
         return newPrice;
       });
-    }, 1000);
+    }, 1200);
     return () => clearInterval(interval);
   }, []);
 
   const currentMarketSymbols =
     markets.find((m) => m.id === selectedMarket)?.symbols || [];
 
-  // --- KEEP SYMBOL IN SYNC WITH MARKET ---
   useEffect(() => {
     if (
       currentMarketSymbols.length > 0 &&
@@ -74,168 +65,136 @@ export default function BetPage() {
     }
   }, [currentMarketSymbols]);
 
-  // --- HANDLE BET ---
   async function handleBet(direction) {
     setError("");
     setSuccess("");
     setLoading(true);
-
     try {
       await betAPI.post("/place", {
         symbol: selectedSymbol,
-        stake: parseFloat(stake),
-        direction: direction,
+        stake: Number(stake),
+        direction,
       });
-
-      setSuccess(`Bet placed! ${direction} on ${selectedSymbol}`);
+      setSuccess(`Bet placed! ${direction}`);
       setStake(50);
-
-      setTimeout(() => setSuccess(""), 3000);
+      setTimeout(() => setSuccess(""), 2500);
     } catch (err) {
-      const msg = err.response?.data?.detail || "Failed to place bet";
-      setError(msg);
+      setError(err.response?.data?.detail || "Failed to place bet");
     } finally {
       setLoading(false);
     }
   }
 
-  const minPrice = 50;
-  const maxPrice = 200;
-  const pricePercent = (currentPrice - minPrice) / (maxPrice - minPrice);
-
   return (
-    <div className="min-h-screen bg-[#05050e] px-4 pb-32 flex flex-col items-center text-[#c8c8ee]">
-      {/* Header */}
-      <div className="w-full flex justify-between text-xs text-[#5050a0] mb-4">
-        <span>
-          ZAR <span className="text-[#0de74a] font-bold">110.00</span>
-        </span>
-        <span>
-          ZAR <span className="text-[#0de74a] font-bold">60.00</span>
-        </span>
+    <div className="min-h-screen bg-[#05050e] px-4 pb-32 flex flex-col items-center text-[#c8c8ee] md:px-8 lg:px-16">
+
+      {/* HEADER */}
+      <div className="w-full flex justify-between text-xs text-[#5050a0] mb-3 md:text-sm lg:text-base">
+        <span>ZAR <span className="text-[#0de74a] font-bold">110.00</span></span>
+        <span>ZAR <span className="text-[#0de74a] font-bold">60.00</span></span>
       </div>
 
-      {/* Market & Symbol */}
-      <div className="w-full grid grid-cols-2 gap-2 mb-4">
+      {/* SELECTORS */}
+      <div className="w-full grid grid-cols-2 gap-2 mb-4 md:gap-4">
         <select
           value={selectedMarket}
           onChange={(e) => {
             const market = e.target.value;
             setSelectedMarket(market);
-
             const symbols =
               markets.find((m) => m.id === market)?.symbols || [];
-            if (symbols.length > 0) {
-              setSelectedSymbol(symbols[0]);
-            }
+            if (symbols.length > 0) setSelectedSymbol(symbols[0]);
           }}
-          className="bg-[#0d0820] border border-[#2e2e58] rounded-lg p-2 text-sm text-[#c8c8ee] cursor-pointer"
+          className="bg-[#0d0820] border border-[#2e2e58] rounded-lg p-2 text-sm md:text-base"
         >
           {markets.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.id}
-            </option>
+            <option key={m.id} value={m.id}>{m.id}</option>
           ))}
         </select>
 
         <select
           value={selectedSymbol}
           onChange={(e) => setSelectedSymbol(e.target.value)}
-          className="bg-[#0d0820] border border-[#2e2e58] rounded-lg p-2 text-sm text-[#c8c8ee] cursor-pointer"
+          className="bg-[#0d0820] border border-[#2e2e58] rounded-lg p-2 text-sm md:text-base"
         >
           {currentMarketSymbols.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
+            <option key={s} value={s}>{s}</option>
           ))}
         </select>
       </div>
 
-      {/* Price Display */}
-      <div className="text-center mb-6">
-        <div className="text-[11px] text-[#5050a0] tracking-widest mb-1">
+      {/* DIGIT DISPLAY */}
+      <div className="w-full border border-[#f59e0b] rounded-xl p-4 mb-4 text-center md:p-6">
+        <div className="text-[10px] text-[#5050a0] mb-2 tracking-widest md:text-xs">
           {selectedSymbol} • LIVE PRICE
         </div>
-        <div className="text-3xl font-bold text-yellow-400 flex justify-center gap-1">
-          {currentPrice
-            .toFixed(2)
-            .split("")
-            .map((digit, idx) => (
-              <span
-                key={idx}
-                className="px-1 border border-[#3b3b5c] rounded"
-              >
-                {digit}
-              </span>
-            ))}
+        <div className="flex justify-center gap-2 md:gap-3">
+          {priceHistory.map((digit, idx) => (
+            <div
+              key={idx}
+              className="w-10 h-12 flex items-center justify-center border border-[#f59e0b] rounded text-xl font-bold text-yellow-400 md:w-12 md:h-14 md:text-2xl"
+            >
+              {digit}
+            </div>
+          ))}
         </div>
-        <div className="text-xs text-green-400 mt-1">▲ 0.0038 LIVE</div>
-      </div>
-
-      {/* Probability Orbit */}
-      <div className="relative w-40 h-40 mb-6">
-        <div className="absolute inset-0 rounded-full border border-[#2e2e58] flex items-center justify-center">
-          <div className="w-6 h-6 bg-[#0d0820] rounded-full animate-bounce"></div>
-        </div>
-        <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 flex gap-2 text-xs text-[#5050a0]">
-          <span>r1</span>
-          <span>r2</span>
-          <span>r3</span>
+        <div className="text-xs text-green-400 mt-2 md:text-sm">
+          ▲ 0.0038 ● LIVE
         </div>
       </div>
 
-      {/* Stake */}
-      <div className="w-full mb-4">
-        <label className="block text-[11px] text-[#5050a0] mb-1">
-          STAKE AMOUNT
-        </label>
-        <div className="flex items-center gap-2">
+      {/* ORBIT */}
+      <div className="relative w-52 h-52 mb-6 md:w-64 md:h-64 lg:w-80 lg:h-80">
+        <div className="absolute inset-0 rounded-full border border-dashed border-[#2e2e58]" />
+        <div className="absolute inset-6 rounded-full border border-dashed border-[#2e2e58]" />
+        <div className="absolute inset-12 rounded-full border border-dashed border-[#2e2e58]" />
+
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="w-6 h-6 rounded-full bg-[#00d4ff] shadow-lg shadow-cyan-500/50 md:w-8 md:h-8"></div>
+        </div>
+
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full animate-pulse md:w-4 md:h-4"></div>
+        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-3 h-3 bg-white rounded-full animate-pulse md:w-4 md:h-4"></div>
+      </div>
+
+      {/* STAKE */}
+      <div className="w-full mb-4 bg-[#0d0820] border border-[#2e2e58] rounded-xl p-4 md:p-6">
+        <label className="text-[10px] text-[#5050a0] md:text-xs">STAKE</label>
+        <div className="flex items-center justify-between mt-2">
           <button
             onClick={() => setStake((s) => Math.max(1, Number(s) - 1))}
-            className="bg-[#0d0820] border border-[#2e2e58] rounded-lg w-10 h-10 text-[#c8c8ee]"
+            className="w-10 h-10 border border-[#2e2e58] rounded-lg md:w-12 md:h-12"
           >
             -
           </button>
-          <input
-            type="number"
-            value={stake}
-            onChange={(e) => setStake(e.target.value)}
-            className="bg-[#0d0820] border border-[#2e2e58] rounded-lg p-2 w-full text-center text-[#c8c8ee]"
-          />
+          <span className="text-lg font-bold md:text-xl">R {stake}</span>
           <button
             onClick={() => setStake((s) => Number(s) + 1)}
-            className="bg-[#0d0820] border border-[#2e2e58] rounded-lg w-10 h-10 text-[#c8c8ee]"
+            className="w-10 h-10 border border-[#2e2e58] rounded-lg md:w-12 md:h-12"
           >
             +
           </button>
         </div>
       </div>
 
-      {/* Error / Success */}
-      {error && (
-        <div className="bg-red-900 border border-red-700 text-red-200 rounded-md p-2 mb-2 text-xs w-full text-center">
-          {error}
-        </div>
-      )}
-      {success && (
-        <div className="bg-green-900 border border-green-700 text-green-300 rounded-md p-2 mb-2 text-xs w-full text-center">
-          {success}
-        </div>
-      )}
+      {/* FEEDBACK */}
+      {error && <div className="text-red-400 text-xs mb-2 md:text-sm">{error}</div>}
+      {success && <div className="text-green-400 text-xs mb-2 md:text-sm">{success}</div>}
 
-      {/* Up / Down Buttons */}
-      <div className="w-full grid grid-cols-2 gap-2">
+      {/* ACTION BUTTONS */}
+      <div className="w-full grid grid-cols-2 gap-3 md:gap-4">
         <button
           onClick={() => handleBet("UP")}
           disabled={loading}
-          className="bg-green-700 border border-green-500 text-green-200 font-bold py-3 rounded-lg hover:bg-green-600 disabled:opacity-50"
+          className="border border-green-500 text-green-400 py-3 rounded-xl font-bold md:py-4 md:text-lg"
         >
           ▲ UP
         </button>
+
         <button
           onClick={() => handleBet("DOWN")}
           disabled={loading}
-          className="bg-red-700 border border-red-500 text-red-300 font-bold py-3 rounded-lg hover:bg-red-600 disabled:opacity-50"
+          className="border border-red-500 text-red-400 py-3 rounded-xl font-bold md:py-4 md:text-lg"
         >
           ▼ DOWN
         </button>
