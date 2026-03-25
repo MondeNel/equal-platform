@@ -1,19 +1,15 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite';
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
   server: {
-    port: 5175,
-    strictPort: true,
-    // Proxy API calls to the Gateway to avoid CORS headaches in dev
+    port: 5175, // Your current frontend port
     proxy: {
-      '/api': {
-        target: 'http://localhost:8000',
+      '/api/bet': {
+        target: 'http://127.0.0.1:8006', // Points directly to the OrbitBet container port
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path, // Keeps the /api/bet prefix
       },
-    },
-  },
+    }
+  }
 })

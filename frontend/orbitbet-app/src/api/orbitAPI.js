@@ -1,15 +1,13 @@
-import api from "../../../auth-app/src/api"; // Reusing your existing axios instance
+import api from "../../../auth-app/src/api"; 
+
 
 export const orbitAPI = {
-  // Starts the 3-round sequence on the backend
-  placeBet: (symbol, direction, stake) => 
-    api.post("/api/bet/place", { symbol, direction, stake }),
+  placeBet: (symbol, direction, stake, userId) => 
+    api.post("/api/bet/place", { symbol, direction, stake }, { headers: { 'x-user-id': userId } }),
 
-  // Polls for the current status of an ongoing bet
-  getActiveBet: () => 
-    api.get("/api/bet/active"),
+  continueBet: (betId, userId) => 
+    api.post("/api/bet/continue", { bet_id: betId }, { headers: { 'x-user-id': userId } }),
 
-  // Fetches user XP, Level, and Streaks
-  getStats: () => 
-    api.get("/api/bet/stats"),
+  getActiveBet: (userId) => 
+    api.get("/api/bet/active", { headers: { 'x-user-id': userId } }),
 };

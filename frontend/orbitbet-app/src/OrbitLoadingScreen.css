@@ -1,0 +1,181 @@
+.orbit-loading-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #050510; /* Deep space dark */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 60px 0;
+  z-index: 9999;
+  font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: white;
+}
+
+.game-title {
+  font-size: 2.5rem;
+  letter-spacing: 8px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 0 20px rgba(255, 255, 255, 0.4);
+}
+
+/* --- SCALED UP SATURN SYSTEM --- */
+
+.saturn-container {
+  position: relative;
+  /* Increased from 300px to 450px to accommodate the bigger planet */
+  width: 450px; 
+  height: 450px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.saturn-planet {
+  /* Increased from 100px to 160px */
+  width: 160px;
+  height: 160px;
+  background: radial-gradient(circle at 30% 30%, #ffd27d, #d4a017);
+  border-radius: 50%;
+  z-index: 2;
+  /* Stronger shadow for the bigger size */
+  box-shadow: inset -25px -25px 50px rgba(0,0,0,0.9);
+  animation: planet-pulse 4s ease-in-out infinite;
+}
+
+.saturn-rings {
+  position: absolute;
+  /* Increased to 340px to wrap around the larger planet */
+  width: 340px;
+  height: 80px;
+  border: 12px solid rgba(212, 160, 23, 0.4);
+  border-radius: 50%;
+  transform: rotateX(75deg) rotateY(-15deg);
+  z-index: 3;
+}
+
+/* --- UPDATED ORBIT PATH --- */
+
+.orbit-path {
+  position: absolute;
+  /* Widened the orbit so the dot doesn't crash into the bigger rings */
+  width: 380px;
+  height: 380px;
+  border-radius: 50%;
+  animation: orbit-spin 4s linear infinite;
+  z-index: 4;
+}
+
+.orbiting-dot {
+  /* Made the dot slightly bigger too (18px instead of 14px) */
+  width: 18px;
+  height: 18px;
+  background: #00f2ff;
+  border-radius: 50%;
+  box-shadow: 0 0 20px #00f2ff, 0 0 40px #00f2ff;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Adjust the title margin so it doesn't feel cramped with the bigger planet */
+.game-title {
+  margin-bottom: 20px;
+}
+
+/* The Orbiting Dot Logic */
+.orbit-path {
+  position: absolute;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  /* Using a 3D rotation to make the dot look like it goes behind the planet */
+  animation: orbit-spin 3s linear infinite;
+  z-index: 4;
+}
+
+.orbiting-dot {
+  width: 14px;
+  height: 14px;
+  background: #00f2ff; /* Bright Cyan */
+  border-radius: 50%;
+  box-shadow: 0 0 15px #00f2ff, 0 0 30px #00f2ff;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+@keyframes orbit-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Footer & Progress Bar */
+.footer-section {
+  width: 80%;
+  max-width: 400px;
+  text-align: center;
+}
+
+.slogan {
+  font-style: italic;
+  font-size: 1.1rem;
+  color: #888;
+  margin-bottom: 25px;
+}
+
+.progress-container {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0082ff, #00f2ff);
+  transition: width 0.3s ease-out;
+}
+
+.percentage {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.orbit-loading-container {
+  /* ... existing styles ... */
+  transition: opacity 0.6s ease-out, visibility 0.6s;
+  opacity: 1;
+  visibility: visible;
+}
+
+/* The Fade Out state */
+.orbit-loading-container.fade-out {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Let's make the dot orbit a bit slower to match the 4-second vibe */
+.orbit-path {
+  /* ... existing styles ... */
+  animation: orbit-spin 4s linear infinite; /* Slowed down from 3s */
+}
+
+/* Optional: Pulse effect on the planet while loading */
+.saturn-planet {
+  /* ... existing styles ... */
+  animation: planet-pulse 4s ease-in-out infinite;
+}
+
+@keyframes planet-pulse {
+  0%, 100% { transform: scale(1); box-shadow: inset -15px -15px 30px rgba(0,0,0,0.8); }
+  50% { transform: scale(1.05); box-shadow: inset -15px -15px 30px rgba(0,0,0,0.6), 0 0 20px rgba(212, 160, 23, 0.2); }
+}
