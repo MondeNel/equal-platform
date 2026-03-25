@@ -1,4 +1,3 @@
-/* src/index.css */
 @import "tailwindcss";
 
 @keyframes glow-blue { 
@@ -11,9 +10,57 @@
   50% { opacity: 0.3; } 
 }
 
-/* Apply the custom font and background from the blueprint */
+@keyframes scan {
+  0% { top: 0%; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* New Animation for the drifting Nebula */
+@keyframes nebula-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-2%, 2%) scale(1.1); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
 body {
-  background-color: #07080f;
+  /* Dark space base with a slight deep blue radial tint */
+  background: radial-gradient(circle at center, #0a0b1e 0%, #07080f 100%);
   font-family: 'Courier New', monospace;
   margin: 0;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Layering the Nebula Glows directly into the body */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  /* Cyan glow in top left, Purple in bottom right */
+  background: 
+    radial-gradient(circle at 20% 20%, rgba(0, 212, 255, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 80% 80%, rgba(110, 0, 255, 0.1) 0%, transparent 40%);
+  pointer-events: none;
+  z-index: -2;
+  animation: nebula-drift 15s ease-in-out infinite;
+}
+
+/* The Perspective Grid (The "Floor") */
+body::after {
+  content: "";
+  position: fixed;
+  bottom: 0; left: 0; width: 100%; height: 50%;
+  background-image: 
+    linear-gradient(rgba(0, 242, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  /* This creates the 3D 'leaning back' effect */
+  transform: perspective(1000px) rotateX(65deg);
+  transform-origin: bottom;
+  mask-image: linear-gradient(to top, rgba(0,0,0,1), transparent);
+  pointer-events: none;
+  z-index: -1;
 }
