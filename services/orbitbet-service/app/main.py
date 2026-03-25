@@ -5,15 +5,18 @@ from app.database import engine, Base
 from app.routers.bet import router as bet_router
 import os
 
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # --- AUTO-MIGRATION ON STARTUP ---
+    # This creates the tables (bets, player_stats) if they don't exist
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
-
 
 app = FastAPI(title="eQual OrbitBet Service", version="1.0.0", lifespan=lifespan)
 
-origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5170").split(",")
+# Broaden origins for local dev if necessary
+origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5170,http://localhost:5173").split(",")
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,7 +27,6 @@ app.add_middleware(
 )
 
 app.include_router(bet_router)
-
 
 @app.get("/health")
 async def health():

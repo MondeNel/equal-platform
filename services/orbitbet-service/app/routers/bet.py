@@ -1,79 +1,30 @@
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.dialects.postgresql import insert
 from decimal import Decimal
-from datetime import datetime, date
 import uuid
-import httpx
-import os
 
 from app.database import get_db
 from app.models import Bet, PlayerStats
-from app.schemas import PlaceBetRequest
+from app.schemas import PlaceBetRequest, ResolveBetRequest
 from app.services.bet_engine import (
     get_current_price,
     resolve_round,
-    calculate_payout,
-    calculate_xp,
-    get_level,
-    is_near_miss,
-    get_streak_milestone,
-    MIN_STAKE,
-    MAX_STAKE,
-    MULTIPLIER,
+    is_near_miss_price,
 )
 
 router = APIRouter(prefix="/api/bet", tags=["orbitbet"])
 
-WALLET_SERVICE = os.getenv("WALLET_SERVICE_URL", "http://wallet-service:8000")
+# --- B2B Multiplier Table ---
+STREAK_BONUSES = {3: 3, 6: 6, 9: 9, 12: 12, 15: 15, 18: 18}
 
-
-async def get_or_create_stats(user_id: str, db: AsyncSession) -> PlayerStats:
-    result = await db.execute(
-        select(PlayerStats).where(PlayerStats.user_id == uuid.UUID(user_id))
-    )
-    stats = result.scalar_one_or_none()
-
-    if not stats:
-        stats = PlayerStats(
-            user_id      = uuid.UUID(user_id),
-            xp           = 0,
-            level        = 1,
-            win_streak   = 0,
-            best_streak  = 0,
-            login_streak = 1,
-            total_bets   = 0,
-            total_wins   = 0,
-            last_login   = date.today(),
-        )
-        db.add(stats)
-        await db.commit()
-        await db.refresh(stats)
-
-    return stats
-
-
-@router.get("/markets")
-async def get_markets():
-    return {
-        "markets": [
-            {
-                "id":      "Crypto",
-                "label":   "Crypto",
-                "symbols": ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD"],
-            },
-            {
-                "id":      "Forex",
-                "label":   "Forex",
-                "symbols": ["USD/ZAR", "EUR/USD", "GBP/USD", "USD/JPY"],
-            },
-        ],
-        "multiplier":  float(MULTIPLIER),
-        "min_stake":   float(MIN_STAKE),
-        "max_stake":   float(MAX_STAKE),
-    }
-
+def calculate_multiplier(streak: int) -> Decimal:
+    """Calculates the active multiplier based on current win streak."""
+    multi = Decimal("1.0")
+    for milestone in sorted(STREAK_BONUSES.keys()):
+        if streak >= milestone:
+            multi = Decimal(str(STREAK_BONUSES[milestone]))
+    return multi
 
 @router.post("/place")
 async def place_bet(
@@ -81,191 +32,104 @@ async def place_bet(
     x_user_id: str = Header(...),
     db: AsyncSession = Depends(get_db),
 ):
-    if data.direction not in ("UP", "DOWN"):
-        raise HTTPException(status_code=400, detail="Direction must be UP or DOWN")
-
-    if data.stake < MIN_STAKE:
-        raise HTTPException(status_code=400, detail=f"Minimum stake is R{MIN_STAKE}")
-
-    if data.stake > MAX_STAKE:
-        raise HTTPException(status_code=400, detail=f"Maximum stake is R{MAX_STAKE}")
-
-    # Debit wallet
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        res = await client.post(
-            f"{WALLET_SERVICE}/api/wallet/debit",
-            json={
-                "amount":    float(data.stake),
-                "reference": f"BET-{data.symbol}-{data.direction}",
-            },
-            headers={"x-user-id": x_user_id},
-        )
-        if res.status_code != 200:
-            raise HTTPException(status_code=400, detail="Insufficient balance")
-
-    # Get entry price
+    user_uuid = uuid.UUID(x_user_id)
+    
+    # 1. Fetch Entry Price
     entry_price = await get_current_price(data.symbol)
+    
+    # 2. Resolve Round 1 (Outer Ring)
+    current_price = await get_current_price(data.symbol) 
+    result = resolve_round(data.direction, entry_price, current_price)
 
-    # Create bet
+    # 3. Fetch Player Stats for Streak Multiplier
+    stats_query = await db.execute(select(PlayerStats).where(PlayerStats.user_id == user_uuid))
+    stats = stats_query.scalar_one_or_none()
+    
+    if not stats:
+        stats = PlayerStats(user_id=user_uuid)
+        db.add(stats)
+    
+    active_multi = calculate_multiplier(stats.win_streak)
+
     bet = Bet(
-        user_id     = uuid.UUID(x_user_id),
-        symbol      = data.symbol,
-        direction   = data.direction,
-        stake       = data.stake,
-        multiplier  = MULTIPLIER,
-        entry_price = Decimal(str(entry_price)),
-        status      = "ACTIVE",
+        user_id=user_uuid,
+        symbol=data.symbol,
+        direction=data.direction,
+        stake=data.stake,
+        multiplier=active_multi,
+        entry_price=Decimal(str(entry_price)),
+        round_1=result,
+        current_step=1,
+        status="ACTIVE" if result == "WIN" else "LOST"
     )
+
+    if result == "LOSS":
+        stats.win_streak = 0  # Reset streak immediately on first-ring loss
+
     db.add(bet)
     await db.commit()
     await db.refresh(bet)
 
-    # Resolve all 3 rounds with small delay simulation
-    rounds = []
-    wins   = 0
-    losses = 0
-    prices = [entry_price]
-
-    for i in range(3):
-        current_price = await get_current_price(data.symbol)
-        prices.append(current_price)
-        result = resolve_round(data.direction, entry_price, current_price)
-        rounds.append(result)
-        if result == "WIN":
-            wins += 1
-        else:
-            losses += 1
-
-    # Determine outcome
-    won    = wins >= 2
-    payout = calculate_payout(data.stake, wins)
-
-    # Update bet
-    bet.round_1     = rounds[0]
-    bet.round_2     = rounds[1]
-    bet.round_3     = rounds[2]
-    bet.wins        = wins
-    bet.losses      = losses
-    bet.status      = "WON" if won else "LOST"
-    bet.payout      = payout
-    bet.resolved_at = datetime.utcnow()
-
-    # Update player stats
-    stats = await get_or_create_stats(x_user_id, db)
-    stats.total_bets += 1
-
-    if won:
-        stats.total_wins += 1
-        stats.win_streak += 1
-        if stats.win_streak > stats.best_streak:
-            stats.best_streak = stats.win_streak
-    else:
-        stats.win_streak = 0
-
-    xp_earned    = calculate_xp(won, stats.win_streak)
-    stats.xp    += xp_earned
-    stats.level  = get_level(stats.xp)
-
-    await db.commit()
-    await db.refresh(bet)
-    await db.refresh(stats)
-
-    # Credit payout if won
-    if won and payout > 0:
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            await client.post(
-                f"{WALLET_SERVICE}/api/wallet/credit",
-                json={
-                    "amount":    float(payout),
-                    "reference": f"BET-WIN-{bet.id}",
-                },
-                headers={"x-user-id": x_user_id},
-            )
-
-    # Check streak milestone
-    milestone = get_streak_milestone(stats.win_streak) if won else None
-
-    # Near miss detection
-    near_miss = is_near_miss(rounds[0], rounds[1]) if len(rounds) >= 2 else False
-
     return {
-        "id":          str(bet.id),
-        "symbol":      bet.symbol,
-        "direction":   bet.direction,
-        "stake":       float(bet.stake),
-        "entry_price": float(bet.entry_price),
-        "rounds": [
-            {"round": i + 1, "result": r, "price": prices[i + 1]}
-            for i, r in enumerate(rounds)
-        ],
-        "wins":        wins,
-        "losses":      losses,
-        "status":      bet.status,
-        "payout":      float(payout),
-        "multiplier":  float(MULTIPLIER),
-        "near_miss":   near_miss,
-        "xp_earned":   xp_earned,
-        "stats": {
-            "xp":          stats.xp,
-            "level":       stats.level,
-            "win_streak":  stats.win_streak,
-            "best_streak": stats.best_streak,
-            "total_bets":  stats.total_bets,
-            "total_wins":  stats.total_wins,
-        },
-        "milestone":   milestone,
-        "resolved_at": bet.resolved_at.isoformat(),
+        "bet_id": str(bet.id),
+        "result": result,
+        "step": 1,
+        "streak": stats.win_streak,
+        "multiplier": float(active_multi),
+        "status": bet.status
     }
 
-
-@router.get("/history")
-async def get_bet_history(
-    x_user_id: str = Header(...),
-    db: AsyncSession = Depends(get_db),
+@router.post("/continue")
+async def continue_bet(
+    data: ResolveBetRequest, 
+    x_user_id: str = Header(...), 
+    db: AsyncSession = Depends(get_db)
 ):
-    result = await db.execute(
-        select(Bet)
-        .where(Bet.user_id == uuid.UUID(x_user_id))
-        .order_by(Bet.created_at.desc())
-        .limit(50)
-    )
-    bets = result.scalars().all()
-    return [
-        {
-            "id":          str(b.id),
-            "symbol":      b.symbol,
-            "direction":   b.direction,
-            "stake":       float(b.stake),
-            "round_1":     b.round_1,
-            "round_2":     b.round_2,
-            "round_3":     b.round_3,
-            "wins":        b.wins,
-            "losses":      b.losses,
-            "status":      b.status,
-            "payout":      float(b.payout) if b.payout else 0,
-            "created_at":  b.created_at.isoformat(),
-            "resolved_at": b.resolved_at.isoformat() if b.resolved_at else None,
-        }
-        for b in bets
-    ]
+    user_uuid = uuid.UUID(x_user_id)
+    result = await db.execute(select(Bet).where(Bet.id == uuid.UUID(data.bet_id)))
+    bet = result.scalar_one_or_none()
 
+    if not bet or bet.status != "ACTIVE":
+        raise HTTPException(status_code=400, detail="No active bet found")
 
-@router.get("/stats")
-async def get_stats(
-    x_user_id: str = Header(...),
-    db: AsyncSession = Depends(get_db),
-):
-    stats = await get_or_create_stats(x_user_id, db)
-    win_rate = round((stats.total_wins / stats.total_bets * 100), 1) if stats.total_bets > 0 else 0
+    # Resolve Round 2 (Inner Ring)
+    next_step = 2 
+    current_price = await get_current_price(bet.symbol)
+    round_result = resolve_round(bet.direction, float(bet.entry_price), current_price)
+
+    # Fetch Stats to update streak
+    stats_query = await db.execute(select(PlayerStats).where(PlayerStats.user_id == user_uuid))
+    stats = stats_query.scalar_one_or_none()
+
+    final_visual_result = round_result
+    if round_result == "LOSS":
+        if is_near_miss_price(bet.direction, float(bet.entry_price), current_price):
+            final_visual_result = "NEAR_MISS"
+        
+        bet.status = "LOST"
+        bet.round_2 = "LOSS"
+        stats.win_streak = 0 # Reset streak
+    else:
+        # WIN - Complete the Orbit
+        bet.round_2 = "WIN"
+        bet.status = "WON"
+        stats.win_streak += 1
+        if stats.win_streak > stats.max_streak:
+            stats.max_streak = stats.win_streak
+        
+        # Calculate Payout (Stake * Base Orbit Multiplier * Streak Bonus)
+        base_orbit_multi = Decimal("1.85")
+        bet.payout = bet.stake * base_orbit_multi * bet.multiplier
+        # TODO: Trigger wallet-service.credit_balance(user_id, bet.payout)
+
+    bet.current_step = next_step
+    await db.commit()
 
     return {
-        "xp":          stats.xp,
-        "level":       stats.level,
-        "xp_to_next":  500 - (stats.xp % 500),
-        "win_streak":  stats.win_streak,
-        "best_streak": stats.best_streak,
-        "login_streak": stats.login_streak,
-        "total_bets":  stats.total_bets,
-        "total_wins":  stats.total_wins,
-        "win_rate":    win_rate,
+        "result": final_visual_result, 
+        "step": next_step, 
+        "status": bet.status,
+        "streak": stats.win_streak,
+        "multiplier": float(calculate_multiplier(stats.win_streak)),
+        "bet_id": str(bet.id)
     }
