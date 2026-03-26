@@ -1,0 +1,1 @@
+"""OrbitBet Service - Gamified price prediction betting"""
