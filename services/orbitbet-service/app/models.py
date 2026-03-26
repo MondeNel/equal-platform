@@ -102,9 +102,9 @@ class PlayerStats(Base):
             self.level = new_level
         return self.level
 
-   def add_xp(self, amount: int):
-    self.xp += amount
-    self.update_level()
+    def add_xp(self, amount: int):
+        self.xp += amount
+        self.update_level()
 
 
 def record_win(self, payout: float):
