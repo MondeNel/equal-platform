@@ -3,6 +3,7 @@ import OrbitTicker from '../components/OrbitTicker';
 import OrbitCanvas from '../components/OrbitCanvas';
 import { useOrbitGame } from '../hooks/useOrbitGame';
 import StreakStack from '../components/StreakStack';
+import BottomNav from '../components/BottomNav';
 
 export default function OrbitBetPage() {
   const [balance] = useState(110.00);
@@ -63,15 +64,16 @@ export default function OrbitBetPage() {
         </div>
       )}
 
-      <div className="max-w-[390px] mx-auto min-h-screen bg-black/70 backdrop-blur-xl flex flex-col border-x border-white/20 relative">
+      {/* Main content container with compact spacing */}
+      <div className="max-w-[390px] mx-auto min-h-screen bg-black/70 backdrop-blur-xl flex flex-col border-x border-white/20 relative pb-[72px]">
         
-        {/* Header Balance Bar */}
-        <div className="flex justify-between items-center px-5 py-4 bg-white/5 border-b border-white/10">
+        {/* Header Balance Bar - more compact */}
+        <div className="flex justify-between items-center px-5 py-3 bg-white/5 border-b border-white/10">
           <div className="flex flex-col">
             <span className="text-[8px] text-cyan-400 font-black tracking-[2px] uppercase mb-0.5">
               ACCOUNT BALANCE
             </span>
-            <span className="text-base font-black text-white tracking-tight">
+            <span className="text-sm font-black text-white tracking-tight">
               ZAR {balance.toFixed(2)}
             </span>
           </div>
@@ -80,29 +82,29 @@ export default function OrbitBetPage() {
             <span className="text-[8px] text-white/30 font-black tracking-[2px] uppercase mb-0.5">
               POTENTIAL WIN
             </span>
-            <span className="text-base font-black text-green-400 tracking-tight">
+            <span className="text-sm font-black text-green-400 tracking-tight">
               ZAR {payoutData ? payoutData.total.toFixed(2) : (stake * 1.85).toFixed(2)}
             </span>
           </div>
         </div>
         
-        {/* Market Selectors */}
-        <div className="flex gap-2.5 px-5 pt-4 pb-2">
-          <div className="flex-1 bg-white/10 border border-white/10 rounded-lg px-3 py-2 flex justify-between items-center">
-            <span className="text-[11px] text-white/80">Crypto</span>
-            <span className="text-[9px] text-white/40">▼</span>
+        {/* Market Selectors - more compact */}
+        <div className="flex gap-2.5 px-5 pt-3 pb-1">
+          <div className="flex-1 bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 flex justify-between items-center">
+            <span className="text-[10px] text-white/80">Crypto</span>
+            <span className="text-[8px] text-white/40">▼</span>
           </div>
-          <div className="flex-1 bg-yellow-400/10 border border-yellow-400/30 rounded-lg px-3 py-2 flex justify-between items-center">
-            <span className="text-[11px] text-yellow-400 font-bold">BTC/USD</span>
+          <div className="flex-1 bg-yellow-400/10 border border-yellow-400/30 rounded-lg px-3 py-1.5 flex justify-between items-center">
+            <span className="text-[10px] text-yellow-400 font-bold">BTC/USD</span>
           </div>
-          <div className="flex items-center gap-2 bg-orange-500/20 px-3 py-2 rounded-lg border border-orange-500/30">
-            <span className="text-[10px]">🔥</span>
-            <span className="text-sm font-black text-orange-400">{streak}</span>
+          <div className="flex items-center gap-1.5 bg-orange-500/20 px-2.5 py-1.5 rounded-lg border border-orange-500/30">
+            <span className="text-[9px]">🔥</span>
+            <span className="text-xs font-black text-orange-400">{streak}</span>
           </div>
         </div>
 
-        {/* Streak Stack - ABOVE the price ticker */}
-        <div className="px-5 mt-4">
+        {/* Streak Stack - reduced margin */}
+        <div className="px-5 mt-2">
           <StreakStack 
             streakCount={streak} 
             currentRound={currentRound} 
@@ -110,9 +112,9 @@ export default function OrbitBetPage() {
           />
         </div>
 
-        {/* Price Ticker */}
-        <div className="px-5 mt-6">
-          <div className="bg-white/5 border border-white/10 rounded-xl p-5 backdrop-blur-sm shadow-inner relative overflow-hidden">
+        {/* Price Ticker - reduced padding */}
+        <div className="px-5 mt-3">
+          <div className="bg-white/5 border border-white/10 rounded-xl p-3 backdrop-blur-sm shadow-inner relative overflow-hidden">
             <OrbitTicker 
               payoutData={payoutData} 
               isWin={status === 'win'} 
@@ -120,9 +122,9 @@ export default function OrbitBetPage() {
           </div>
         </div>
 
-        {/* Orbit Visualization */}
-        <div className="flex flex-col items-center flex-1 justify-center py-8">
-          <div className="relative scale-110">
+        {/* Orbit Visualization - smaller scale */}
+        <div className="flex flex-col items-center justify-center py-2">
+          <div className="relative scale-90">
             <OrbitCanvas 
               round={currentRound} 
               status={status === 'spinning' ? 'orbiting' : status} 
@@ -132,44 +134,44 @@ export default function OrbitBetPage() {
           
           {/* Round Indicator */}
           {!payoutData && status !== 'win' && status !== 'loss' && status !== 'spinning' && (
-            <div className="mt-6 text-center">
-              <span className="text-[9px] text-cyan-400 tracking-[3px] uppercase font-bold">
+            <div className="mt-2 text-center">
+              <span className="text-[8px] text-cyan-400 tracking-[3px] uppercase font-bold">
                 ROUND {currentRound} OF 3
               </span>
             </div>
           )}
           
           {status === 'spinning' && (
-            <div className="mt-6 text-center">
-              <span className="text-[9px] text-yellow-400 tracking-[3px] uppercase font-bold animate-pulse">
+            <div className="mt-2 text-center">
+              <span className="text-[8px] text-yellow-400 tracking-[3px] uppercase font-bold animate-pulse">
                 SPINNING...
               </span>
             </div>
           )}
         </div>
 
-        {/* Controls */}
-        <div className="px-5 pb-8">
+        {/* Controls - compact */}
+        <div className="px-5 pb-6 mt-1">
           {/* Stake Selector */}
-          <div className="bg-white/5 border border-white/10 rounded-xl p-4 mb-4">
+          <div className="bg-white/5 border border-white/10 rounded-xl p-3 mb-3">
             <div className="flex justify-between items-center">
               <button 
                 onClick={() => setStake(s => Math.max(10, s-10))} 
                 disabled={status === 'spinning'}
-                className="w-12 h-12 bg-white/10 rounded-lg text-white font-bold text-2xl hover:bg-white/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                className="w-10 h-10 bg-white/10 rounded-lg text-white font-bold text-xl hover:bg-white/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 −
               </button>
               <div className="text-center">
-                <span className="text-[9px] text-white/40 block uppercase tracking-widest mb-1">
+                <span className="text-[8px] text-white/40 block uppercase tracking-widest mb-0.5">
                   BET AMOUNT
                 </span>
-                <span className="text-2xl font-black text-white">R {stake}</span>
+                <span className="text-xl font-black text-white">R {stake}</span>
               </div>
               <button 
                 onClick={() => setStake(s => Math.min(10000, s+10))} 
                 disabled={status === 'spinning'}
-                className="w-12 h-12 bg-white/10 rounded-lg text-white font-bold text-2xl hover:bg-white/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                className="w-10 h-10 bg-white/10 rounded-lg text-white font-bold text-xl hover:bg-white/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
               >
                 +
               </button>
@@ -181,20 +183,23 @@ export default function OrbitBetPage() {
             <button 
               onClick={() => placeBet('UP', stake)} 
               disabled={status === 'spinning'}
-              className="flex-1 bg-green-500/20 border-2 border-green-500 rounded-xl py-4 text-green-400 font-black text-sm tracking-[4px] hover:bg-green-500 hover:text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase"
+              className="flex-1 bg-green-500/20 border-2 border-green-500 rounded-xl py-3 text-green-400 font-black text-xs tracking-[4px] hover:bg-green-500 hover:text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase"
             >
               ▲ UP
             </button>
             <button 
               onClick={() => placeBet('DOWN', stake)} 
               disabled={status === 'spinning'}
-              className="flex-1 bg-red-500/20 border-2 border-red-500 rounded-xl py-4 text-red-400 font-black text-sm tracking-[4px] hover:bg-red-500 hover:text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase"
+              className="flex-1 bg-red-500/20 border-2 border-red-500 rounded-xl py-3 text-red-400 font-black text-xs tracking-[4px] hover:bg-red-500 hover:text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase"
             >
               DOWN ▼
             </button>
           </div>
         </div>
       </div>
+
+      {/* Bottom Navigation - Fixed at bottom */}
+      <BottomNav active="bet" />
     </div>
   );
 }

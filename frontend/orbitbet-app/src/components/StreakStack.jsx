@@ -12,42 +12,42 @@ const StreakStack = ({ streakCount, currentRound, roundResults }) => {
 
   return (
     <div className="w-full">
-      {/* Round Progress Bars */}
-      <div className="flex justify-between gap-2 mb-4">
+      {/* Round Progress Bars - compact */}
+      <div className="flex justify-between gap-2 mb-2">
         {[1, 2, 3].map((r) => (
           <div key={r} className="flex-1 flex flex-col items-center">
-            <div className={`h-1.5 w-full rounded-full transition-all duration-500 ${
+            <div className={`h-1 w-full rounded-full transition-all duration-500 ${
               roundResults[r-1] === 'win' ? 'bg-cyan-400 shadow-[0_0_8px_#22d3ee]' :
               roundResults[r-1] === 'loss' ? 'bg-red-500' :
               currentRound === r ? 'bg-white/60 animate-pulse' : 'bg-white/20'
             }`} />
-            <span className="text-[8px] mt-1 font-bold text-white/40 uppercase tracking-wider">
-              ROUND {r}
+            <span className="text-[7px] mt-0.5 font-bold text-white/40 uppercase tracking-wider">
+              R{r}
             </span>
           </div>
         ))}
       </div>
 
-      {/* Streak Bonuses */}
-      <div className="flex flex-col-reverse gap-1.5">
+      {/* Streak Bonuses - compact */}
+      <div className="flex flex-col-reverse gap-1">
         {milestones.map((m) => {
           const isActive = streakCount >= m.wins;
           return (
             <div 
               key={m.wins} 
               className={`
-                h-10 px-4 rounded-lg border-2 flex items-center justify-between transition-all duration-500
+                h-7 px-3 rounded-md border flex items-center justify-between transition-all duration-500
                 ${isActive 
-                  ? `bg-white/20 ${m.color} border-${m.color.split('-')[1]}-400 shadow-[0_0_15px_rgba(34,211,238,0.3)]` 
+                  ? `bg-white/20 ${m.color} border-${m.color.split('-')[1]}-400 shadow-[0_0_10px_rgba(34,211,238,0.2)]` 
                   : 'bg-white/5 border-white/10 opacity-40'
                 }
               `}
             >
-              <span className={`text-[10px] font-black tracking-wider ${isActive ? 'text-white' : 'text-white/40'}`}>
-                🔥 {m.wins} WINS
+              <span className={`text-[8px] font-black tracking-wider ${isActive ? 'text-white' : 'text-white/40'}`}>
+                🔥 {m.wins}
               </span>
-              <span className={`text-[11px] font-black italic tracking-tighter ${isActive ? 'text-white' : 'text-white/20'}`}>
-                BONUS {m.multi}
+              <span className={`text-[9px] font-black italic tracking-tighter ${isActive ? 'text-white' : 'text-white/20'}`}>
+                {m.multi}
               </span>
             </div>
           );
