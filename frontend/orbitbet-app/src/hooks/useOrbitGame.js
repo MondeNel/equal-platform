@@ -3,95 +3,139 @@ import { orbitAPI } from '../api/orbitAPI';
 
 export const useOrbitGame = () => {
   const [currentRound, setCurrentRound] = useState(1);
-  const [status, setStatus] = useState('idle');
+  const [status, setStatus] = useState('ready'); // ready, spinning, win, loss
   const [isPlaying, setIsPlaying] = useState(false);
   const [roundResults, setRoundResults] = useState([null, null, null]);
   const [activeBetId, setActiveBetId] = useState(null);
+  const [streak, setStreak] = useState(0);
+  const [payoutData, setPayoutData] = useState(null);
+  const [showFlash, setShowFlash] = useState(false);
+  const [xpGained, setXpGained] = useState(0);
 
-  // In production, this would come from your Auth context
-  const TEST_USER_ID = '550e8400-e29b-41d4-a716-446655440000';
+  const TEST_USER_ID = '11111111-1111-1111-1111-111111111111';
 
-  // --- HELPER: Reset local state ---
+  // Check for active bet on load
+  useEffect(() => {
+    const checkActiveBet = async () => {
+      try {
+        const response = await orbitAPI.getActiveBet(TEST_USER_ID);
+        if (response.data.has_active_bet) {
+          const activeBet = response.data;
+          setActiveBetId(activeBet.bet_id);
+          setCurrentRound(activeBet.current_round);
+          
+          // Restore previous round results
+          const results = [null, null, null];
+          if (activeBet.round_1_result) results[0] = activeBet.round_1_result.toLowerCase();
+          if (activeBet.round_2_result) results[1] = activeBet.round_2_result.toLowerCase();
+          setRoundResults(results);
+          
+          setStatus('ready');
+        }
+      } catch (err) {
+        console.error("Failed to check active bet:", err);
+      }
+    };
+    
+    checkActiveBet();
+  }, []);
+
   const resetGame = () => {
     setActiveBetId(null);
     setCurrentRound(1);
     setRoundResults([null, null, null]);
+    setStatus('ready');
+    setShowFlash(false);
+    setPayoutData(null);
+    setXpGained(0);
   };
 
-  // --- RECOVERY: Check for active sessions on mount ---
-  useEffect(() => {
-    const recoverGame = async () => {
-      try {
-        const res = await orbitAPI.getActiveBet(TEST_USER_ID);
-        
-        if (res.data && res.data.active) {
-          setActiveBetId(res.data.bet_id);
-          // Set the UI to the current progress
-          setCurrentRound(res.data.step + 1); 
-          setRoundResults(res.data.results || [null, null, null]);
-        }
-      } catch (err) {
-        console.error("Game recovery failed:", err);
-      }
-    };
-    recoverGame();
-  }, []);
+  const placeBet = useCallback(async (direction, stakeValue) => {
+    // If game just ended, reset
+    if (status === 'win' || status === 'loss') {
+      resetGame();
+    }
 
-  // --- ACTION: Place or Continue Bet ---
-  const placeBet = useCallback(async (direction) => {
-    if (isPlaying || (status !== 'idle' && status !== 'ready')) return;
+    // Prevent multiple clicks
+    if (isPlaying || status === 'spinning') return;
     
     setIsPlaying(true);
-    setStatus('orbiting'); // New status for visual spinning feedback
+    setStatus('spinning');
 
     try {
       let response;
       
+      // If we have an active bet, resolve the next round
       if (activeBetId) {
-        // Continue existing 3-round sequence
-        response = await orbitAPI.continueBet(activeBetId, TEST_USER_ID);
+        response = await orbitAPI.resolveRound(
+          activeBetId, 
+          direction.toUpperCase(), 
+          TEST_USER_ID
+        );
       } else {
-        // Start fresh Round 1
-        response = await orbitAPI.placeBet("BTC/USD", direction, 50, TEST_USER_ID);
+        // Start new bet
+        response = await orbitAPI.placeBet(
+          "BTC/USD", 
+          direction.toUpperCase(), 
+          stakeValue, 
+          TEST_USER_ID
+        );
+        setActiveBetId(response.data.bet_id);
       }
       
-      const { result, step, bet_id } = response.data;
-
-      // 1s delay to let the planet animation finish spinning
+      const roundResult = response.data;
+      
+      // Update round result
       setTimeout(() => {
-        const isWin = result === 'WIN';
-        const newResults = [...roundResults];
+        const isWin = roundResult.result === 'WIN';
         
-        // Update the specific dot for the round just played
-        newResults[step - 1] = isWin ? 'win' : 'loss';
-        setRoundResults(newResults);
-
-        if (isWin) {
-          if (step < 3) {
-            // Move to next ring
-            setActiveBetId(bet_id || activeBetId);
-            setCurrentRound(step + 1);
-            setStatus('idle'); 
-          } else {
-            // Final Round Win
+        setRoundResults(prev => {
+          const updated = [...prev];
+          updated[roundResult.round_number - 1] = isWin ? 'win' : 'loss';
+          return updated;
+        });
+        
+        if (roundResult.is_complete) {
+          // Game finished
+          if (roundResult.final_result === 'WIN') {
             setStatus('win');
-            setActiveBetId(null); 
+            setPayoutData({
+              stake: roundResult.payout / 1.85, // Approximate original stake
+              multiplier: 1.85,
+              total: roundResult.payout
+            });
+            if (roundResult.streak_stats) {
+              setStreak(roundResult.streak_stats.win_streak);
+              setXpGained(roundResult.streak_stats.xp_gained);
+              if (roundResult.streak_stats.milestones_awarded > 0) {
+                setShowFlash(true);
+                setTimeout(() => setShowFlash(false), 3000);
+              }
+            }
+          } else {
+            setStatus('loss');
+            if (roundResult.streak_stats) {
+              setStreak(0);
+              setXpGained(roundResult.streak_stats.xp_gained);
+            }
           }
-        } else {
-          // Any loss ends the sequence
-          setStatus('loss');
           setActiveBetId(null);
+        } else {
+          // Move to next round
+          setCurrentRound(roundResult.next_round);
+          setStatus('ready');
         }
         
         setIsPlaying(false);
-      }, 1000);
+      }, 800); // Shorter delay for better UX
 
     } catch (err) {
-      console.error("Bet action failed:", err);
-      setStatus('idle');
+      console.error("Orbit action failed:", err);
+      console.error("Error details:", err.response?.data);
+      setStatus('ready');
       setIsPlaying(false);
     }
-  }, [isPlaying, status, activeBetId, roundResults]);
+  }, [isPlaying, status, activeBetId]);
 
   return { 
     currentRound, 
@@ -99,6 +143,10 @@ export const useOrbitGame = () => {
     isPlaying, 
     roundResults, 
     placeBet, 
-    resetGame 
+    resetGame, 
+    streak, 
+    payoutData, 
+    showFlash,
+    xpGained
   };
 };

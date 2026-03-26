@@ -102,19 +102,22 @@ class PlayerStats(Base):
             self.level = new_level
         return self.level
 
-    def add_xp(self, amount: int):
-        self.xp += amount
-        self.update_level()
+   def add_xp(self, amount: int):
+    self.xp += amount
+    self.update_level()
 
-    def record_win(self, payout: float):
-        self.win_streak += 1
-        self.total_wins += 1
-        self.orbit_wins += 1
-        self.total_payout += payout
-        if self.win_streak > self.best_win_streak:
-            self.best_win_streak = self.win_streak
-        if self.win_streak > self.max_streak:
-            self.max_streak = self.win_streak
+
+def record_win(self, payout: float):
+    self.win_streak += 1
+    self.total_wins += 1
+    self.orbit_wins += 1
+    # Convert payout to Decimal before adding
+    from decimal import Decimal
+    self.total_payout = self.total_payout + Decimal(str(payout))
+    if self.win_streak > self.best_win_streak:
+        self.best_win_streak = self.win_streak
+    if self.win_streak > self.max_streak:
+        self.max_streak = self.win_streak
 
     def record_loss(self):
         self.win_streak = 0

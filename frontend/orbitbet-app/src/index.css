@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @keyframes glow-blue { 
   0%, 100% { box-shadow: 0 0 8px #00d4ff44; }  
@@ -17,15 +19,31 @@
   100% { top: 100%; opacity: 0; }
 }
 
-/* New Animation for the drifting Nebula */
 @keyframes nebula-drift {
   0% { transform: translate(0, 0) scale(1); }
   50% { transform: translate(-2%, 2%) scale(1.1); }
   100% { transform: translate(0, 0) scale(1); }
 }
 
+@keyframes fade-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.1); }
+}
+
+.animate-in {
+  animation: fade-in 0.3s ease-out;
+}
+
+.animate-bounce {
+  animation: bounce 0.5s ease-out;
+}
+
 body {
-  /* Dark space base with a slight deep blue radial tint */
   background: radial-gradient(circle at center, #0a0b1e 0%, #07080f 100%);
   font-family: 'Courier New', monospace;
   margin: 0;
@@ -34,12 +52,13 @@ body {
   overflow-x: hidden;
 }
 
-/* Layering the Nebula Glows directly into the body */
 body::before {
   content: "";
   position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  /* Cyan glow in top left, Purple in bottom right */
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   background: 
     radial-gradient(circle at 20% 20%, rgba(0, 212, 255, 0.08) 0%, transparent 40%),
     radial-gradient(circle at 80% 80%, rgba(110, 0, 255, 0.1) 0%, transparent 40%);
@@ -48,19 +67,57 @@ body::before {
   animation: nebula-drift 15s ease-in-out infinite;
 }
 
-/* The Perspective Grid (The "Floor") */
 body::after {
   content: "";
   position: fixed;
-  bottom: 0; left: 0; width: 100%; height: 50%;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 50%;
   background-image: 
     linear-gradient(rgba(0, 242, 255, 0.03) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
   background-size: 60px 60px;
-  /* This creates the 3D 'leaning back' effect */
   transform: perspective(1000px) rotateX(65deg);
   transform-origin: bottom;
   mask-image: linear-gradient(to top, rgba(0,0,0,1), transparent);
   pointer-events: none;
   z-index: -1;
+}
+
+/* Custom utility classes */
+.bg-equal-bg {
+  background-color: #05050e;
+}
+
+.bg-equal-panel {
+  background-color: #0d0820;
+}
+
+.bg-equal-card {
+  background-color: #0a0a1e;
+}
+
+.border-equal-border {
+  border-color: #1e1e3a;
+}
+
+.text-equal-dim {
+  color: #5050a0;
+}
+
+.text-equal-cyan {
+  color: #38bdf8;
+}
+
+.text-equal-green {
+  color: #4ade80;
+}
+
+.text-equal-red {
+  color: #f87171;
+}
+
+.text-equal-gold {
+  color: #facc15;
 }
