@@ -1,22 +1,14 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import LandingPage from "./pages/LandingPage";
-import BottomNav from "./components/BottomNav";
+import React, { Suspense } from 'react';
+// Lazy load the remote MFE
+const OrbitGame = React.lazy(() => import('orbitbet_app/OrbitGame'));
 
-export default function App() {
+function App() {
   return (
-    <BrowserRouter>
-      <div style={{ minHeight: "100vh", background: "#05050e", display: "flex", flexDirection: "column" }}>
-    
-        {/* Main content */}
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/home" element={<LandingPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-
-        {/* Bottom Nav always visible */}
-        <BottomNav active="home" />
-      </div>
-    </BrowserRouter>
+    <div className="platform-container">
+      <h1>Equal Adventure Platform</h1>
+      <Suspense fallback={<div>Loading OrbitBet...</div>}>
+        <OrbitGame userId="user-uuid-from-auth" />
+      </Suspense>
+    </div>
   );
 }
