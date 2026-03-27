@@ -1,13 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import os
+
 from app.database import engine, Base
 from app.routers.wallet import router as wallet_router
-import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Don't attempt to create tables on startup — let routes handle it
+    # Create tables if they don't exist
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
     yield
 
 app = FastAPI(title="eQual Wallet Service", version="1.0.0", lifespan=lifespan)

@@ -1,98 +1,56 @@
-import httpx
 import asyncio
-import json
-import os
+import random
 from datetime import datetime
 
-# In-memory price cache
 _prices = {}
 _last_updated = {}
 
-SYMBOL_MAP = {
-    "BTC/USD": "bitcoin",
-    "ETH/USD": "ethereum",
-    "SOL/USD": "solana",
-    "XRP/USD": "ripple",
+ALL_SYMBOLS = [
+    "USD/ZAR", "EUR/USD", "GBP/USD", "USD/JPY",
+    "BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD",
+    "APPLE", "TESLA", "NVIDIA", "AMAZON"
+]
+
+DEFAULT_PRICES = {
+    "USD/ZAR": 18.25, "EUR/USD": 1.085, "GBP/USD": 1.265, "USD/JPY": 149.5,
+    "BTC/USD": 67000, "ETH/USD": 3800, "SOL/USD": 180, "XRP/USD": 0.62,
+    "APPLE": 185.5, "TESLA": 248.9, "NVIDIA": 875.6, "AMAZON": 182.3,
 }
 
-FOREX_PAIRS = {
-    "USD/ZAR": ("USD", "ZAR"),
-    "EUR/USD": ("EUR", "USD"),
-    "GBP/USD": ("GBP", "USD"),
-    "USD/JPY": ("USD", "JPY"),
+VOLATILITY = {
+    "Crypto": 0.002, "Forex": 0.0005, "Stocks": 0.001,
 }
 
-STOCK_PRICES = {
-    "APPLE":  185.50,
-    "TESLA":  248.90,
-    "NVIDIA": 875.60,
-    "AMAZON": 182.30,
-}
+def get_asset_class(symbol):
+    if symbol in ["BTC/USD", "ETH/USD", "SOL/USD", "XRP/USD"]:
+        return "Crypto"
+    if symbol in ["USD/ZAR", "EUR/USD", "GBP/USD", "USD/JPY"]:
+        return "Forex"
+    return "Stocks"
 
+def simulate_price(symbol):
+    current = _prices.get(symbol, DEFAULT_PRICES.get(symbol, 100.0))
+    asset = get_asset_class(symbol)
+    vol = VOLATILITY.get(asset, 0.001)
+    change = random.uniform(-vol, vol)
+    new_price = current * (1 + change)
+    new_price = max(new_price, 0.01)
+    if asset == "Crypto":
+        return round(new_price, 2)
+    elif asset == "Forex":
+        return round(new_price, 5)
+    else:
+        return round(new_price, 2)
 
-async def fetch_crypto_prices():
-    try:
-        ids = ",".join(SYMBOL_MAP.values())
-        url = f"https://api.coingecko.com/api/v3/simple/price?ids={ids}&vs_currencies=usd"
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.get(url)
-            data = res.json()
-            for symbol, coin_id in SYMBOL_MAP.items():
-                if coin_id in data:
-                    _prices[symbol] = float(data[coin_id]["usd"])
-                    _last_updated[symbol] = datetime.utcnow()
-    except Exception as e:
-        print(f"Crypto fetch error: {e}")
+async def update_simulated_prices():
+    for sym in ALL_SYMBOLS:
+        _prices[sym] = simulate_price(sym)
+        _last_updated[sym] = datetime.utcnow()
 
+def get_price(symbol):
+    return _prices.get(symbol, DEFAULT_PRICES.get(symbol, 0.0))
 
-async def fetch_forex_prices():
-    try:
-        url = "https://api.frankfurter.app/latest?from=USD"
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.get(url)
-            data = res.json()
-            rates = data.get("rates", {})
-
-            # USD/ZAR
-            if "ZAR" in rates:
-                _prices["USD/ZAR"] = float(rates["ZAR"])
-                _last_updated["USD/ZAR"] = datetime.utcnow()
-
-            # EUR/USD
-            if "EUR" in rates:
-                _prices["EUR/USD"] = round(1 / float(rates["EUR"]), 5)
-                _last_updated["EUR/USD"] = datetime.utcnow()
-
-            # GBP/USD
-            if "GBP" in rates:
-                _prices["GBP/USD"] = round(1 / float(rates["GBP"]), 5)
-                _last_updated["GBP/USD"] = datetime.utcnow()
-
-            # USD/JPY
-            if "JPY" in rates:
-                _prices["USD/JPY"] = float(rates["JPY"])
-                _last_updated["USD/JPY"] = datetime.utcnow()
-
-    except Exception as e:
-        print(f"Forex fetch error: {e}")
-
-
-def get_price(symbol: str) -> float:
-    # Stocks use static prices with small drift
-    if symbol in STOCK_PRICES:
-        import random
-        base = STOCK_PRICES[symbol]
-        drift = base * random.uniform(-0.001, 0.001)
-        return round(base + drift, 2)
-
-    return _prices.get(symbol, 0.0)
-
-
-async def realtime_price_updater():
-    """Background task — fetches prices every 15 seconds"""
+async def fast_simulation_ticker():
     while True:
-        await asyncio.gather(
-            fetch_crypto_prices(),
-            fetch_forex_prices(),
-        )
-        await asyncio.sleep(15)
+        await update_simulated_prices()
+        await asyncio.sleep(2)

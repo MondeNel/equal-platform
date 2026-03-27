@@ -26,18 +26,11 @@ async def get_or_create_wallet(user_id: str, db: AsyncSession) -> Wallet:
     if not wallet:
         wallet = Wallet(
             user_id = uuid.UUID(user_id),
-            balance = Decimal("10000.00"),  # Welcome bonus — R10,000
+            balance = Decimal("0"),  
             margin  = Decimal("0"),
         )
         db.add(wallet)
-        # Record welcome bonus transaction
-        tx = Transaction(
-            user_id     = uuid.UUID(user_id),
-            type        = "WELCOME_BONUS",
-            amount      = Decimal("10000.00"),
-            description = "Welcome bonus — start trading",
-        )
-        db.add(tx)
+        # No welcome bonus transaction
         await db.commit()
         await db.refresh(wallet)
 

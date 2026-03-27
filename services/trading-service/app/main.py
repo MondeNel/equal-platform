@@ -2,23 +2,28 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import asyncio
+import os
 
 from app.database import engine, Base
 from app.routers.prices import router as prices_router
 from app.routers.orders import router as orders_router
 from app.routers.trades import router as trades_router
 from app.routers.peter import router as peter_router
-from app.services.price_service import realtime_price_updater
-import os
+from app.services.price_service import fast_simulation_ticker, DEFAULT_PRICES, _prices
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    # Start background price updater
-    task = asyncio.create_task(realtime_price_updater())
+    
+    # Initialize prices with defaults
+    for sym, price in DEFAULT_PRICES.items():
+        _prices[sym] = price
+    
+    # Start only the simulation ticker
+    sim_task = asyncio.create_task(fast_simulation_ticker())
     yield
-    task.cancel()
+    sim_task.cancel()
 
 app = FastAPI(title="eQual Trading Service", version="1.0.0", lifespan=lifespan)
 
