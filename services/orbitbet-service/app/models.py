@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     CheckConstraint,
     Index,
+    Boolean,
     func
 )
 from sqlalchemy.dialects.postgresql import UUID
@@ -47,6 +48,12 @@ class Bet(Base):
     payout = Column(Numeric(18, 4), nullable=True)
 
     reservation_id = Column(String(100), nullable=True)
+
+    # New fields for predetermined outcome
+    predetermined_outcome = Column(Boolean, nullable=True)  # True = WIN, False = LOSS
+    round_1_pred = Column(String(5), nullable=True)
+    round_2_pred = Column(String(5), nullable=True)
+    round_3_pred = Column(String(5), nullable=True)
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     last_step_at = Column(DateTime(timezone=True), nullable=True, onupdate=func.now())
@@ -106,18 +113,16 @@ class PlayerStats(Base):
         self.xp += amount
         self.update_level()
 
-
-def record_win(self, payout: float):
-    self.win_streak += 1
-    self.total_wins += 1
-    self.orbit_wins += 1
-    # Convert payout to Decimal before adding
-    from decimal import Decimal
-    self.total_payout = self.total_payout + Decimal(str(payout))
-    if self.win_streak > self.best_win_streak:
-        self.best_win_streak = self.win_streak
-    if self.win_streak > self.max_streak:
-        self.max_streak = self.win_streak
+    def record_win(self, payout: float):
+        self.win_streak += 1
+        self.total_wins += 1
+        self.orbit_wins += 1
+        from decimal import Decimal
+        self.total_payout = self.total_payout + Decimal(str(payout))
+        if self.win_streak > self.best_win_streak:
+            self.best_win_streak = self.win_streak
+        if self.win_streak > self.max_streak:
+            self.max_streak = self.win_streak
 
     def record_loss(self):
         self.win_streak = 0

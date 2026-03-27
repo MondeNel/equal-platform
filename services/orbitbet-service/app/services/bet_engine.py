@@ -23,65 +23,81 @@ STREAK_BONUSES: Dict[int, Decimal] = {
     18: Decimal("0.60"),  # 60% bonus
 }
 
-# Simulated price rotation for testing
-TEST_MODE_PRICES: Dict[str, List[float]] = {
-    "BTC/USD": [67000.0, 67001.2, 67000.8, 67002.5, 67001.5, 67003.0],
-    "ETH/USD": [2100.0, 2101.5, 2099.8, 2102.0, 2100.5, 2103.0],
-    "USD/ZAR": [18.25, 18.27, 18.24, 18.29, 18.26, 18.31],
+# Target RTP
+TARGET_RTP = Decimal("0.85")  # 85% return on stake
+WIN_PROBABILITY = float(TARGET_RTP / BASE_ORBIT_MULTIPLIER)  # ~0.4595
+
+# Price ranges for different symbols (for visual effect)
+SYMBOL_PRICE_RANGES = {
+    "BTC/USD": (66000, 69000),
+    "ETH/USD": (2000, 2300),
+    "USD/ZAR": (18, 20),
 }
+DEFAULT_RANGE = (100, 200)
 
-_price_index: Dict[str, int] = {}
+def get_win_probability() -> float:
+    """Return fixed win probability for each bet."""
+    return WIN_PROBABILITY
 
+def determine_outcome() -> bool:
+    """Return True for WIN, False for LOSS based on win probability."""
+    return random.random() < WIN_PROBABILITY
+
+def generate_round_results(overall_win: bool) -> List[str]:
+    """
+    Generate a sequence of 3 round results (WIN/LOSS) that lead to the overall outcome.
+    Overall win means at least 2 wins. We'll randomly choose a pattern that satisfies.
+    """
+    if overall_win:
+        patterns = [
+            ["WIN", "WIN", "LOSS"],
+            ["WIN", "LOSS", "WIN"],
+            ["LOSS", "WIN", "WIN"],
+            ["WIN", "WIN", "WIN"],
+        ]
+    else:
+        patterns = [
+            ["WIN", "LOSS", "LOSS"],
+            ["LOSS", "WIN", "LOSS"],
+            ["LOSS", "LOSS", "WIN"],
+            ["LOSS", "LOSS", "LOSS"],
+        ]
+    return random.choice(patterns)
 
 async def get_current_price(symbol: str, test_mode: bool = True) -> float:
     """
-    Fetch current price. In test_mode, rotates through predefined prices.
+    Return a random price for visual effect.
     """
-    try:
-        if test_mode:
-            # Get or initialize price index for this symbol
-            if symbol not in _price_index:
-                _price_index[symbol] = 0
-            
-            # Get price list for symbol or use default
-            prices = TEST_MODE_PRICES.get(symbol, [100.0, 100.1, 99.9, 100.2])
-            
-            # Get current price
-            price = prices[_price_index[symbol] % len(prices)]
-            _price_index[symbol] += 1
-            
-            # Add small random noise for realism
-            noise = random.uniform(-0.05, 0.05)
-            price += noise
-            
-            result = round(price, 4)
-            logger.debug(f"Price for {symbol}: {result}")
-            return result
-        
-        # Real fetch code - to be implemented with CoinGecko
-        import httpx
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            res = await client.get(f"http://trading-service:8000/api/prices/{symbol}")
-            data = res.json()
-            price = float(data.get("price", 0))
-            if price <= 0:
-                raise ValueError("Invalid price")
-            return price
-            
-    except Exception as e:
-        logger.error(f"Price fetch failed: {e}")
-        # Fallback to a default price
-        return 100.0
+    low, high = SYMBOL_PRICE_RANGES.get(symbol, DEFAULT_RANGE)
+    return round(random.uniform(low, high), 4)
 
+def generate_price_for_round(entry_price: float, direction: str, result: str) -> float:
+    """
+    Generate an exit price that satisfies the result given the user's direction.
+    If result == "WIN", then for direction UP, exit_price > entry_price; for DOWN, exit_price < entry_price.
+    If result == "LOSS", the opposite.
+    """
+    # Determine movement direction based on result and user's direction
+    if result == "WIN":
+        if direction == "UP":
+            movement = random.uniform(0.001, 0.01)   # up 0.1% to 1%
+        else:  # DOWN
+            movement = random.uniform(-0.01, -0.001) # down 0.1% to 1%
+    else:  # LOSS
+        if direction == "UP":
+            movement = random.uniform(-0.01, -0.001) # down
+        else:  # DOWN
+            movement = random.uniform(0.001, 0.01)   # up
+    exit_price = entry_price * (1 + movement)
+    return round(exit_price, 4)
 
 def resolve_round(direction: str, entry_price: float, current_price: float) -> str:
     """
-    Determine round outcome.
+    Determine round outcome based on price movement. (Not used in new logic, but kept for reference.)
     """
     entry = round(float(entry_price), 6)
     current = round(float(current_price), 6)
     direction = direction.upper()
-    
     if current == entry:
         return "WIN"
     if direction == "UP":
@@ -90,7 +106,6 @@ def resolve_round(direction: str, entry_price: float, current_price: float) -> s
         return "WIN" if current < entry else "LOSS"
     return "LOSS"
 
-
 def calculate_streak_bonus(streak: int) -> Decimal:
     """Calculate streak bonus percentage."""
     for milestone in sorted(STREAK_BONUSES.keys(), reverse=True):
@@ -98,14 +113,12 @@ def calculate_streak_bonus(streak: int) -> Decimal:
             return STREAK_BONUSES[milestone]
     return Decimal("0.00")
 
-
 def calculate_final_payout_with_streak(stake: Decimal, streak: int) -> Decimal:
     """Calculate final payout including streak bonus."""
     base_payout = stake * BASE_ORBIT_MULTIPLIER
     streak_bonus_pct = calculate_streak_bonus(streak)
     total_payout = base_payout * (Decimal("1.00") + streak_bonus_pct)
     return total_payout.quantize(Decimal("0.01"))
-
 
 def calculate_xp(won: bool, win_streak: int) -> int:
     """Calculate XP earned from a completed bet."""
