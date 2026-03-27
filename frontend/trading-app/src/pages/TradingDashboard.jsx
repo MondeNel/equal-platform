@@ -4,6 +4,7 @@ import { walletAPI, pricesAPI, ordersAPI, tradesAPI, subscriptionAPI } from "../
 import CandleChart from "../components/CandleChart";
 import PeterModal from "../components/PeterModal";
 import WalletModal from "../components/WalletModal";
+import BottomNav from '../../../shell/src/components/BottomNav';
 
 export default function TradingDashboard() {
   const [market,       setMarket]       = useState("Forex");
@@ -797,6 +798,8 @@ export default function TradingDashboard() {
 
         </div>
       </div>
+
+      <BottomNav active="trade" />
     </div>
   );
 }
