@@ -1,35 +1,24 @@
+# services/trading-service/app/routers/orders.py
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from decimal import Decimal
 import uuid
-import httpx
-import os
+import logging
 
 from app.database import get_db
 from app.models import PendingOrder, OpenTrade
 from app.schemas import PlaceOrderRequest, ActivateOrderRequest
+from app.services.wallet_mock import reserve_margin, release_margin
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
-
-WALLET_SERVICE = os.getenv("WALLET_SERVICE_URL", "http://wallet-service:8000")
+logger = logging.getLogger(__name__)
 
 LOT_PIP_VALUES = {
     "Macro":    Decimal("0.10"),
     "Mini":     Decimal("1.00"),
     "Standard": Decimal("10.00"),
 }
-
-
-async def reserve_margin(user_id: str, amount: Decimal, reference: str):
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        res = await client.post(
-            f"{WALLET_SERVICE}/api/wallet/reserve",
-            json={"amount": float(amount), "reference": reference},
-            headers={"x-user-id": user_id},
-        )
-        if res.status_code != 200:
-            raise HTTPException(status_code=400, detail="Insufficient balance")
 
 
 @router.post("/place")
@@ -42,7 +31,7 @@ async def place_order(
     margin = pip_value * Decimal("100") * Decimal(str(data.volume))
 
     order_ref = str(uuid.uuid4())
-    await reserve_margin(x_user_id, margin, order_ref)
+    await reserve_margin(x_user_id, float(margin), order_ref)
 
     order = PendingOrder(
         user_id     = uuid.UUID(x_user_id),
@@ -120,12 +109,7 @@ async def cancel_order(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
 
-    async with httpx.AsyncClient() as client:
-        await client.post(
-            f"{WALLET_SERVICE}/api/wallet/release",
-            json={"amount": float(order.margin), "reference": str(order.id), "pnl": 0},
-            headers={"x-user-id": x_user_id},
-        )
+    await release_margin(x_user_id, str(order.id), 0)
 
     order.status = "CANCELLED"
     await db.commit()

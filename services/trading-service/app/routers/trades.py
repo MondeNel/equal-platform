@@ -1,20 +1,20 @@
+# services/trading-service/app/routers/trades.py
 from fastapi import APIRouter, Depends, HTTPException, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from decimal import Decimal
 import uuid
-import httpx
-import os
+import logging
 from datetime import datetime
 
 from app.database import get_db
 from app.models import OpenTrade, TradeHistory
 from app.schemas import CloseTradeRequest
 from app.services.price_service import get_price
+from app.services.wallet_mock import release_margin
 
 router = APIRouter(prefix="/api/trades", tags=["trades"])
-
-WALLET_SERVICE = os.getenv("WALLET_SERVICE_URL", "http://wallet-service:8000")
+logger = logging.getLogger(__name__)
 
 LOT_PIP_VALUES = {
     "Macro":    Decimal("0.10"),
@@ -108,16 +108,7 @@ async def close_trade(
     await db.delete(trade)
 
     # Release margin + apply PnL
-    async with httpx.AsyncClient() as client:
-        await client.post(
-            f"{WALLET_SERVICE}/api/wallet/release",
-            json={
-                "amount":    float(trade.margin),
-                "reference": str(trade.id),
-                "pnl":       float(pnl),
-            },
-            headers={"x-user-id": x_user_id},
-        )
+    await release_margin(x_user_id, str(trade.id), float(pnl))
 
     await db.commit()
 
@@ -165,16 +156,7 @@ async def close_all_trades(
         db.add(history)
         await db.delete(trade)
 
-        async with httpx.AsyncClient() as client:
-            await client.post(
-                f"{WALLET_SERVICE}/api/wallet/release",
-                json={
-                    "amount":    float(trade.margin),
-                    "reference": str(trade.id),
-                    "pnl":       float(pnl),
-                },
-                headers={"x-user-id": x_user_id},
-            )
+        await release_margin(x_user_id, str(trade.id), float(pnl))
 
         closed.append(str(trade.id))
 
