@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 import random
 import asyncio
+import urllib.parse
 
 router = APIRouter(prefix="/api/prices", tags=["prices"])
 
@@ -57,7 +58,7 @@ async def price_updater():
 
 @router.get("/{symbol:path}")
 async def get_price(symbol: str):
-    # Handle URL encoded slashes
-    symbol = symbol.replace("%2F", "/")
+    # Decode URL encoded symbols
+    symbol = urllib.parse.unquote(symbol)
     price = _prices.get(symbol, DEFAULT_PRICES.get(symbol, 0))
     return {"symbol": symbol, "price": price}

@@ -147,7 +147,7 @@ services:
       - "8003:8000"
     env_file: .env
     environment:
-      - WALLET_SERVICE_URL=http://wallet-service:8002
+      - WALLET_SERVICE_URL=http://wallet-service:8000
       - TRADING_SERVICE_URL=http://trading-service:8003
     depends_on:
       trading-db:
