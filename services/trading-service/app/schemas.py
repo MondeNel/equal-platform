@@ -2,28 +2,60 @@ from pydantic import BaseModel
 from typing import Optional
 from decimal import Decimal
 from datetime import datetime
+from uuid import UUID
 
 class PlaceOrderRequest(BaseModel):
-    symbol:      str
-    direction:   str
-    lot_size:    str
-    volume:      int = 1
+    symbol: str
+    direction: str
+    lot_size: str
+    volume: int = 1
     entry_price: Decimal
     take_profit: Optional[Decimal] = None
-    stop_loss:   Optional[Decimal] = None
+    stop_loss: Optional[Decimal] = None
 
 class ActivateOrderRequest(BaseModel):
     activation_price: Decimal
 
 class CloseTradeRequest(BaseModel):
-    close_price:  Optional[Decimal] = None
+    close_price: Optional[Decimal] = None
     close_reason: str = "MANUAL"
 
-class PeterAnalyseRequest(BaseModel):
-    symbol:    str
-    direction: Optional[str] = None
-    entry:     Optional[Decimal] = None
-    tp:        Optional[Decimal] = None
-    sl:        Optional[Decimal] = None
-    price:     Optional[Decimal] = None
-    analysis_type: str = "TREND"
+class OrderResponse(BaseModel):
+    id: UUID
+    symbol: str
+    direction: str
+    lot_size: str
+    volume: int
+    entry_price: float
+    take_profit: Optional[float]
+    stop_loss: Optional[float]
+    margin: float
+    status: str
+    created_at: datetime
+
+class TradeResponse(BaseModel):
+    id: UUID
+    symbol: str
+    direction: str
+    lot_size: str
+    volume: int
+    entry_price: float
+    take_profit: Optional[float]
+    stop_loss: Optional[float]
+    current_price: Optional[float]
+    pnl: float
+    margin: float
+    opened_at: datetime
+
+class TradeHistoryResponse(BaseModel):
+    id: UUID
+    symbol: str
+    direction: str
+    lot_size: str
+    volume: int
+    entry_price: float
+    close_price: float
+    pnl: float
+    close_reason: str
+    opened_at: datetime
+    closed_at: datetime

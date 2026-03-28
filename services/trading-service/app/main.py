@@ -5,25 +5,19 @@ import asyncio
 import os
 
 from app.database import engine, Base
-from app.routers.prices import router as prices_router
 from app.routers.orders import router as orders_router
 from app.routers.trades import router as trades_router
-from app.routers.peter import router as peter_router
-from app.services.price_service import fast_simulation_ticker, DEFAULT_PRICES, _prices
+from app.routers.prices import router as prices_router
+from app.routers.prices import price_updater
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Create tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-    
-    # Initialize prices with defaults
-    for sym, price in DEFAULT_PRICES.items():
-        _prices[sym] = price
-    
-    # Start only the simulation ticker
-    sim_task = asyncio.create_task(fast_simulation_ticker())
+    # Start price updater
+    asyncio.create_task(price_updater())
     yield
-    sim_task.cancel()
 
 app = FastAPI(title="eQual Trading Service", version="1.0.0", lifespan=lifespan)
 
@@ -37,10 +31,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(prices_router)
 app.include_router(orders_router)
 app.include_router(trades_router)
-app.include_router(peter_router)
+app.include_router(prices_router)
 
 @app.get("/health")
 async def health():
