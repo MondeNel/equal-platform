@@ -146,11 +146,16 @@ services:
     ports:
       - "8003:8000"
     env_file: .env
+    environment:
+      - WALLET_SERVICE_URL=http://wallet-service:8002
+      - TRADING_SERVICE_URL=http://trading-service:8003
     depends_on:
       trading-db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      wallet-service:
+        condition: service_started
     restart: unless-stopped
 
   arb-service:
