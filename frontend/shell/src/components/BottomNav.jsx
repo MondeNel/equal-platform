@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 
 const TABS = [
   { id: "bet",     label: "BET",     route: "http://localhost:5175", color: "#f97316" },
-  { id: "trade",   label: "TRADE",   route: "http://localhost:5172", color: "#4ade80" },
-  { id: "arb",     label: "ARB",     route: "http://localhost:5173", color: "#facc15" },
-  { id: "follow",  label: "FOLLOW",  route: "http://localhost:5174", color: "#f472b6" },
-  { id: "profile", label: "PROFILE", route: "http://localhost:5176", color: "#38bdf8" },
+  { id: "trade",   label: "TRADE",   route: "http://localhost:5173", color: "#4ade80" },
+  { id: "arb",     label: "ARB",     route: "http://localhost:5174", color: "#facc15" },
+  { id: "follow",  label: "FOLLOW",  route: "http://localhost:5175", color: "#f472b6" },
+  { id: "profile", label: "PROFILE", route: "http://localhost:5177", color: "#38bdf8" },
 ];
 
 const ICONS = {
