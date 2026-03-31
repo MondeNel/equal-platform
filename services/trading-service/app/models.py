@@ -53,3 +53,15 @@ class TradeHistory(Base):
     close_reason = Column(String, nullable=False)
     opened_at = Column(DateTime(timezone=True), nullable=False)
     closed_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class PlayerStats(Base):
+    __tablename__ = "player_stats"
+
+    user_id = Column(UUID(as_uuid=True), primary_key=True)
+    win_streak = Column(Integer, default=0)
+    max_streak = Column(Integer, default=0)
+    total_wins = Column(Integer, default=0)
+    total_losses = Column(Integer, default=0)
+    total_bets = Column(Integer, default=0)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

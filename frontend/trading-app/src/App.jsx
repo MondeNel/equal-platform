@@ -1,25 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import TradingDashboard from './pages/TradingDashboard';
-import TradeLoadingScreen from './TradeLoadingScreen'; 
+import LoadingScreen from './components/LoadingScreen';
 import './index.css';
 
 function App() {
-  // Directly manage the boot-up state
-  const [isTerminalReady, setIsTerminalReady] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  return (
-    <div className="App bg-black min-h-screen">
-      {!isTerminalReady ? (
-        /* 1. Show the Loading Sequence first */
-        <TradeLoadingScreen onFinish={() => setIsTerminalReady(true)} />
-      ) : (
-        /* 2. Reveal the main Dashboard (Trade interface) */
-        <div className="animate-fade-in">
-          <TradingDashboard />
-        </div>
-      )}
-    </div>
-  );
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  return <TradingDashboard />;
 }
 
 export default App;

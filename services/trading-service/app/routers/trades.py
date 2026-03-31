@@ -7,7 +7,7 @@ import httpx
 import os
 
 from app.database import get_db
-from app.models import OpenTrade, TradeHistory
+from app.models import OpenTrade, TradeHistory, PlayerStats
 from app.schemas import CloseTradeRequest, TradeResponse, TradeHistoryResponse
 
 router = APIRouter(prefix="/api/trades", tags=["trades"])
@@ -18,6 +18,12 @@ LOT_PIP_VALUES = {
     "Macro": Decimal("0.10"),
     "Mini": Decimal("1.00"),
     "Standard": Decimal("10.00"),
+}
+
+STREAK_BONUSES = {
+    3: Decimal('1.85'),
+    6: Decimal('2.0'),
+    9: Decimal('2.5'),
 }
 
 def calculate_pnl(trade: OpenTrade, close_price: float) -> Decimal:
@@ -70,6 +76,7 @@ async def close_trade(
     x_user_id: str = Header(...),
     db: AsyncSession = Depends(get_db)
 ):
+    # Fetch the open trade
     result = await db.execute(
         select(OpenTrade)
         .where(and_(
@@ -82,8 +89,42 @@ async def close_trade(
         raise HTTPException(status_code=404, detail="Trade not found")
     
     close_price = float(data.close_price) if data.close_price else float(trade.entry_price)
-    pnl = calculate_pnl(trade, close_price)
+    base_pnl = calculate_pnl(trade, close_price)
     
+    # Get player stats for streak
+    stats_result = await db.execute(
+        select(PlayerStats).where(PlayerStats.user_id == trade.user_id)
+    )
+    stats = stats_result.scalar_one_or_none()
+    if not stats:
+        stats = PlayerStats(user_id=trade.user_id)
+        db.add(stats)
+        await db.flush()
+    
+    is_win = base_pnl > 0
+    bonus_applied = False
+    final_pnl = base_pnl
+    multiplier = Decimal('1.0')
+    
+    if is_win:
+        stats.win_streak += 1
+        if stats.win_streak > stats.max_streak:
+            stats.max_streak = stats.win_streak
+        stats.total_wins += 1
+        
+        # Apply streak bonus if milestone reached
+        if stats.win_streak in STREAK_BONUSES:
+            multiplier = STREAK_BONUSES[stats.win_streak]
+            final_pnl = base_pnl * multiplier
+            bonus_applied = True
+    else:
+        stats.win_streak = max(0, stats.win_streak - 1)
+        stats.total_losses += 1
+    
+    stats.total_bets += 1
+    await db.commit()
+    
+    # Record history with the final PnL (boosted if applicable)
     history = TradeHistory(
         user_id=trade.user_id,
         symbol=trade.symbol,
@@ -94,20 +135,21 @@ async def close_trade(
         close_price=Decimal(str(close_price)),
         take_profit=trade.take_profit,
         stop_loss=trade.stop_loss,
-        pnl=pnl,
+        pnl=final_pnl,
         close_reason=data.close_reason,
         opened_at=trade.opened_at
     )
     db.add(history)
     await db.delete(trade)
     
+    # Release margin with the final PnL
     async with httpx.AsyncClient() as client:
         await client.post(
             f"{WALLET_SERVICE_URL}/api/wallet/release",
             json={
                 "amount": float(trade.margin),
                 "reference": str(trade.id),
-                "pnl": float(pnl)
+                "pnl": float(final_pnl)
             },
             headers={"X-User-ID": x_user_id}
         )
@@ -122,7 +164,9 @@ async def close_trade(
         "close_price": float(history.close_price),
         "pnl": float(history.pnl),
         "close_reason": history.close_reason,
-        "closed_at": history.closed_at.isoformat()
+        "closed_at": history.closed_at.isoformat(),
+        "bonus_applied": bonus_applied,
+        "win_streak": stats.win_streak
     }
 
 @router.get("/history", response_model=list[TradeHistoryResponse])

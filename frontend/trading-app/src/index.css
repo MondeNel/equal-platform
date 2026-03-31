@@ -2,33 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
-body { background: #08080f; font-family: 'Courier New', monospace; }
-input, textarea, button { font-family: inherit; }
-input:focus, textarea:focus, button:focus { outline: none; }
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #08080f; }
-::-webkit-scrollbar-thumb { background: #1e1e3a; border-radius: 4px; }
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(5px); }
-  to { opacity: 1; transform: translateY(0); }
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.8s ease-out forwards;
+body {
+  background: radial-gradient(circle at center, #0a0b1e 0%, #07080f 100%);
+  font-family: 'Courier New', monospace;
+  color: #e8e8ff;
 }
 
-.center-node {
-  width: 100px;
-  height: 100px;
-  border: 2px solid #22d3ee;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 900;
-  font-size: 1.8rem; /* Slightly larger for EQ */
-  color: #22d3ee;
-  box-shadow: 0 0 30px rgba(34, 211, 238, 0.2);
-  transform: rotate(45deg);
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: #08080f;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e1e3a;
+  border-radius: 4px;
 }

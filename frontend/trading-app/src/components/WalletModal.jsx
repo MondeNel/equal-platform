@@ -1,319 +1,245 @@
-import { useState, useEffect } from "react";
-import { walletAPI } from "../services/api";
+import React, { useState, useEffect } from 'react';
+import { walletAPI } from '../services/api';
 
 export default function WalletModal({ balance, openTrades, onDeposit, onWithdraw, onClose, onCloseAll }) {
-  const [tab,      setTab]      = useState("overview");
-  const [amount,   setAmount]   = useState("");
+  const [tab, setTab] = useState('overview');
+  const [amount, setAmount] = useState('');
   const [feedback, setFeedback] = useState(null);
-  const [txHistory,setTxHistory]= useState([]);
+  const [txHistory, setTxHistory] = useState([]);
 
-  // Load real transaction history from backend on open
   useEffect(() => {
-    walletAPI.transactions().then(res => {
-      const txs = res.data ?? [];
-      setTxHistory(txs.map(t => ({
-        id:     t.id,
-        type:   t.transaction_type === "deposit" ? "DEPOSIT" : "WITHDRAW",
-        amount: parseFloat(t.amount),
-        date:   t.created_at?.slice(0, 10) ?? "",
-        note:   t.transaction_type === "deposit" ? "Manual deposit" : "Manual withdrawal",
-      })));
-    }).catch(() => {});
+    walletAPI.transactions()
+      .then(res => setTxHistory(res.data))
+      .catch(() => {});
   }, []);
 
-  const totalPnl   = openTrades.reduce((s,t)=>s+t.pnl,0);
-  const currentBal = balance + totalPnl;
+  const totalPnl = openTrades.reduce((s, t) => s + (t.pnl || 0), 0);
+  const currentBalance = (balance || 0) + totalPnl;
 
-  const fmt = v => {
-    const abs = Math.abs(v).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2});
-    return (v<0?"−":"")+`ZAR ${abs}`;
+  const fmt = (v) => {
+    const n = Number(v);
+    if (isNaN(n)) return 'ZAR 0,00';
+    const abs = Math.abs(n).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return (n < 0 ? '−' : '') + `ZAR ${abs}`;
   };
 
   const doDeposit = async () => {
     const n = parseFloat(amount);
-    if (!n||n<=0)  { setFeedback({ok:false,msg:"Enter a valid amount"}); return; }
-    if (n < 100)   { setFeedback({ok:false,msg:"Minimum deposit is ZAR 100"}); return; }
+    if (!n || n <= 0) { setFeedback({ ok: false, msg: 'Enter a valid amount' }); return; }
+    if (n < 100) { setFeedback({ ok: false, msg: 'Minimum deposit is ZAR 100' }); return; }
     try {
       await onDeposit(n);
-      setTxHistory(h=>[{id:Date.now(),type:"DEPOSIT",amount:n,date:new Date().toISOString().slice(0,10),note:"Manual deposit"},...h]);
-      setFeedback({ok:true,msg:`ZAR ${n.toLocaleString()} deposited!`});
-      setAmount("");
-      setTimeout(()=>setFeedback(null),3000);
+      setFeedback({ ok: true, msg: `ZAR ${n.toLocaleString()} deposited!` });
+      setAmount('');
+      setTimeout(() => setFeedback(null), 3000);
     } catch {
-      setFeedback({ok:false,msg:"Deposit failed. Try again."});
+      setFeedback({ ok: false, msg: 'Deposit failed. Try again.' });
     }
   };
 
   const doWithdraw = async () => {
     const n = parseFloat(amount);
-    if (!n||n<=0)          { setFeedback({ok:false,msg:"Enter a valid amount"}); return; }
-    if (n>balance)         { setFeedback({ok:false,msg:"Insufficient available balance"}); return; }
-    if (n<100)             { setFeedback({ok:false,msg:"Minimum withdrawal is ZAR 100"}); return; }
-    if (openTrades.length) { setFeedback({ok:false,msg:"Close open trades before withdrawing"}); return; }
+    if (!n || n <= 0) { setFeedback({ ok: false, msg: 'Enter a valid amount' }); return; }
+    if (n > balance) { setFeedback({ ok: false, msg: 'Insufficient available balance' }); return; }
+    if (n < 100) { setFeedback({ ok: false, msg: 'Minimum withdrawal is ZAR 100' }); return; }
+    if (openTrades.length) { setFeedback({ ok: false, msg: 'Close open trades before withdrawing' }); return; }
     try {
       await onWithdraw(n);
-      setTxHistory(h=>[{id:Date.now(),type:"WITHDRAW",amount:n,date:new Date().toISOString().slice(0,10),note:"Manual withdrawal"},...h]);
-      setFeedback({ok:true,msg:`ZAR ${n.toLocaleString()} withdrawn!`});
-      setAmount("");
-      setTimeout(()=>setFeedback(null),3000);
+      setFeedback({ ok: true, msg: `ZAR ${n.toLocaleString()} withdrawn!` });
+      setAmount('');
+      setTimeout(() => setFeedback(null), 3000);
     } catch {
-      setFeedback({ok:false,msg:"Withdrawal failed. Try again."});
+      setFeedback({ ok: false, msg: 'Withdrawal failed. Try again.' });
     }
   };
 
-  const TabBtn = ({id,icon,label}) => (
-    <button onClick={()=>{setTab(id);setFeedback(null);setAmount("");}} style={{
-      flex:1,padding:"11px 2px",background:tab===id?"#0d0d28":"transparent",
-      border:"none",borderBottom:`2px solid ${tab===id?"#38bdf8":"transparent"}`,
-      color:tab===id?"#38bdf8":"#4a4a7a",fontFamily:"inherit",fontSize:9,
-      fontWeight:"bold",letterSpacing:1,cursor:"pointer",transition:"all 0.15s",
-    }}>{icon}<br/>{label}</button>
-  );
-
   return (
-    <div style={{position:"fixed",inset:0,zIndex:250,background:"rgba(1,1,8,0.93)",backdropFilter:"blur(6px)",
-      display:"flex",alignItems:"center",justifyContent:"center",padding:12}}
-      onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-      <style>{`
-        @keyframes wIn{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
-        @keyframes pulseTeal{0%,100%{box-shadow:0 0 12px #38bdf833}50%{box-shadow:0 0 26px #38bdf866}}
-      `}</style>
-      <div style={{width:"100%",maxWidth:"390px",maxHeight:"91vh",overflowY:"auto",
-        background:"linear-gradient(160deg,#08091a,#0c0a22)",border:"1.5px solid #1c1c44",
-        borderRadius:18,fontFamily:"'Courier New',monospace",boxShadow:"0 0 80px #38bdf818",
-        animation:"wIn 0.27s ease-out"}}>
-
-        {/* Header */}
-        <div style={{padding:"20px 20px 0",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="w-full max-w-[390px] max-h-[90vh] overflow-y-auto bg-gradient-to-b from-[#08091a] to-[#0c0a22] border border-[#1c1c44] rounded-xl shadow-xl font-mono">
+        <div className="flex justify-between items-center p-5 border-b border-white/10">
           <div>
-            <div style={{color:"#38bdf8",fontSize:15,fontWeight:"bold",letterSpacing:3}}>⬡ WALLET</div>
-            <div style={{color:"#4a4a7a",fontSize:8,letterSpacing:2,marginTop:2}}>SIMULATION ACCOUNT</div>
+            <div className="text-cyan-400 text-sm font-bold tracking-wider">⬡ WALLET</div>
+            <div className="text-white/40 text-[8px] tracking-wider mt-0.5">SIMULATION ACCOUNT</div>
           </div>
-          <button onClick={onClose} style={{background:"none",border:"none",color:"#5a5a80",fontSize:18,cursor:"pointer",padding:"4px 8px"}}>✕</button>
+          <button onClick={onClose} className="text-white/40 hover:text-white/80 text-xl">✕</button>
         </div>
 
-        {/* Balance cards */}
-        <div style={{padding:"16px 20px 10px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:10}}>
-          <div style={{background:"#06060f",border:"1px solid #1a1a38",borderRadius:10,padding:"12px"}}>
-            <div style={{color:"#4a4a7a",fontSize:8,letterSpacing:2,marginBottom:5}}>DEPOSITED</div>
-            <div style={{color:"#c8c8ff",fontSize:14,fontWeight:"bold",letterSpacing:1}}>{fmt(balance)}</div>
-            <div style={{color:"#2a2a50",fontSize:8,marginTop:4}}>Available funds</div>
+        <div className="grid grid-cols-2 gap-2.5 p-5">
+          <div className="bg-black/20 border border-white/10 rounded-lg p-3">
+            <div className="text-white/40 text-[8px] tracking-wider mb-1">DEPOSITED</div>
+            <div className="text-white text-sm font-bold">{fmt(balance)}</div>
+            <div className="text-white/20 text-[7px] mt-2">Available funds</div>
           </div>
-          <div style={{background:"#06060f",border:`1px solid ${totalPnl>=0?"#22c55e28":"#ef444428"}`,borderRadius:10,padding:"12px"}}>
-            <div style={{color:"#4a4a7a",fontSize:8,letterSpacing:2,marginBottom:5}}>UNREALISED P&L</div>
-            <div style={{color:totalPnl>=0?"#4ade80":"#f87171",fontSize:14,fontWeight:"bold",letterSpacing:1}}>
-              {totalPnl>=0?"+":""}{fmt(totalPnl)}
-            </div>
-            <div style={{color:"#2a2a50",fontSize:8,marginTop:4}}>{openTrades.length} position{openTrades.length!==1?"s":""}</div>
+          <div className="bg-black/20 border border-white/10 rounded-lg p-3">
+            <div className="text-white/40 text-[8px] tracking-wider mb-1">UNREALISED P&L</div>
+            <div className="text-sm font-bold text-white">{fmt(totalPnl)}</div>
+            <div className="text-white/20 text-[7px] mt-2">{openTrades.length} position{openTrades.length !== 1 ? 's' : ''}</div>
           </div>
         </div>
 
-        {/* Total equity */}
-        <div style={{margin:"0 20px 4px",background:"linear-gradient(135deg,#0a1628,#081820)",
-          border:"1px solid #1e3a4a",borderRadius:10,padding:"10px 16px",
-          display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-          <span style={{color:"#6070a0",fontSize:9,letterSpacing:2}}>TOTAL EQUITY</span>
-          <span style={{color:"#facc15",fontSize:17,fontWeight:"bold"}}>{fmt(currentBal)}</span>
+        <div className="mx-5 mb-3 p-2.5 bg-gradient-to-r from-cyan-900/20 to-blue-900/20 border border-cyan-500/30 rounded-lg flex justify-between items-center">
+          <span className="text-white/50 text-[9px] tracking-wider">TOTAL EQUITY</span>
+          <span className="text-gold text-base font-bold">{fmt(currentBalance)}</span>
         </div>
 
-        {/* Tabs */}
-        <div style={{display:"flex",borderBottom:"1px solid #131330",margin:"10px 0 0"}}>
-          <TabBtn id="overview" icon="◈" label="OVERVIEW"/>
-          <TabBtn id="deposit"  icon="↓" label="DEPOSIT"/>
-          <TabBtn id="withdraw" icon="↑" label="WITHDRAW"/>
-          <TabBtn id="history"  icon="≡" label="HISTORY"/>
+        <div className="flex border-b border-white/10">
+          {[
+            { id: 'overview', icon: '◈', label: 'OVERVIEW' },
+            { id: 'deposit', icon: '↓', label: 'DEPOSIT' },
+            { id: 'withdraw', icon: '↑', label: 'WITHDRAW' },
+            { id: 'history', icon: '≡', label: 'HISTORY' },
+          ].map(btn => (
+            <button
+              key={btn.id}
+              onClick={() => { setTab(btn.id); setFeedback(null); setAmount(''); }}
+              className={`flex-1 py-3 text-center border-b-2 transition-colors ${
+                tab === btn.id ? 'border-cyan-400 text-cyan-400' : 'border-transparent text-white/40 hover:text-white/60'
+              }`}
+            >
+              {btn.icon}<br/>{btn.label}
+            </button>
+          ))}
         </div>
 
-        <div style={{padding:"18px 20px 26px"}}>
-
-          {/* Feedback banner */}
+        <div className="p-5">
           {feedback && (
-            <div style={{marginBottom:14,padding:"10px 14px",borderRadius:8,
-              background:feedback.ok?"#052e1618":"#2d0a0a18",
-              border:`1px solid ${feedback.ok?"#22c55e":"#ef4444"}`,
-              color:feedback.ok?"#4ade80":"#f87171",fontSize:10,letterSpacing:1}}>
-              {feedback.ok?"✓":"✗"} {feedback.msg}
+            <div className={`mb-4 p-2.5 rounded-lg text-xs ${feedback.ok ? 'bg-green-500/10 border border-green-500 text-green-400' : 'bg-red-500/10 border border-red-500 text-red-400'}`}>
+              {feedback.ok ? '✓' : '✗'} {feedback.msg}
             </div>
           )}
 
-          {/* ── OVERVIEW ── */}
-          {tab==="overview" && (
-            <div>
-              <div style={{color:"#6060a0",fontSize:8,letterSpacing:2,marginBottom:12}}>OPEN POSITIONS</div>
-
-              {openTrades.length===0 ? (
-                <div style={{textAlign:"center",padding:"28px 0",color:"#2a2a50",fontSize:10,letterSpacing:1,lineHeight:1.8}}>
-                  No open positions<br/>
-                  <span style={{fontSize:9,color:"#1a1a38"}}>Place a trade to start simulating</span>
-                </div>
-              ) : openTrades.map(t=>(
-                <div key={t.id} style={{background:"#07071a",border:`1px solid ${t.type==="BUY"?"#22c55e20":"#ef444420"}`,borderRadius:10,padding:"11px 13px",marginBottom:8}}>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:7}}>
-                    <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                      <span style={{color:t.type==="BUY"?"#4ade80":"#f87171",fontSize:11,fontWeight:"bold",letterSpacing:1}}>{t.type==="BUY"?"▲":"▼"} {t.type}</span>
-                      <span style={{color:"#a78bfa",fontSize:10,letterSpacing:1}}>{t.symbol}</span>
-                    </div>
-                    <div style={{textAlign:"right"}}>
-                      <div style={{color:t.pnl>=0?"#4ade80":"#f87171",fontSize:12,fontWeight:"bold"}}>
-                        {t.pnl>=0?"+":""}{fmt(t.pnl)}
+          {tab === 'overview' && (
+            <>
+              <div className="text-white/40 text-[8px] tracking-wider mb-3">OPEN POSITIONS</div>
+              {openTrades.length === 0 ? (
+                <div className="text-center py-8 text-white/20 text-xs">No open positions</div>
+              ) : (
+                openTrades.map(t => (
+                  <div key={t.id} className="bg-black/20 border border-white/10 rounded-lg p-3 mb-2">
+                    <div className="flex justify-between items-center mb-2">
+                      <div className="flex gap-2 items-center">
+                        <span className={`text-xs font-bold ${t.direction === 'BUY' ? 'text-green-400' : 'text-red-400'}`}>
+                          {t.direction === 'BUY' ? '▲' : '▼'} {t.direction}
+                        </span>
+                        <span className="text-purple-400 text-[10px]">{t.symbol}</span>
                       </div>
-                      <div style={{color:t.pnl>=0?"#22c55e66":"#ef444466",fontSize:8}}>
-                        {t.pips>=0?"+":""}{t.pips} pips
+                      <div className={`text-xs font-bold ${t.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {t.pnl >= 0 ? '+' : ''}{t.pnl.toFixed(2)}
                       </div>
                     </div>
-                  </div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:4,fontSize:8,marginBottom:6}}>
-                    <div><span style={{color:"#2a2a50"}}>ENTRY </span><span style={{color:"#38bdf8"}}>{t.entryStr}</span></div>
-                    <div><span style={{color:"#2a2a50"}}>TP </span><span style={{color:"#4ade80"}}>{t.tpStr||"–"}</span></div>
-                    <div><span style={{color:"#2a2a50"}}>SL </span><span style={{color:"#f87171"}}>{t.slStr||"–"}</span></div>
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                    <span style={{color:"#2e2e58",fontSize:7.5}}>{t.lot} · Vol {t.vol} · {t.time}</span>
-                    <button onClick={()=>onCloseAll(t.id)} style={{background:"#0f0f28",border:"1px solid #3a2a60",color:"#9080c0",
-                      fontSize:8,padding:"3px 10px",borderRadius:4,cursor:"pointer",fontFamily:"inherit",letterSpacing:1}}>
+                    <div className="grid grid-cols-3 gap-1 text-[8px] mb-2">
+                      <div><span className="text-white/40">ENTRY </span><span className="text-cyan-400">{t.entry_price}</span></div>
+                      <div><span className="text-white/40">TP </span><span className="text-green-400">{t.take_profit || '–'}</span></div>
+                      <div><span className="text-white/40">SL </span><span className="text-red-400">{t.stop_loss || '–'}</span></div>
+                    </div>
+                    <button onClick={() => onCloseAll(t.id)} className="w-full text-[8px] bg-white/5 border border-purple-500/30 text-purple-300 py-1 rounded hover:bg-purple-500/10">
                       CLOSE
                     </button>
                   </div>
-                </div>
-              ))}
-
-              {openTrades.length>0 && (
-                <button onClick={()=>onCloseAll("all")} style={{width:"100%",marginTop:6,padding:"9px",borderRadius:8,
-                  background:"#0f0f28",border:"1px solid #3a2a60",color:"#c4b5fd",
-                  fontFamily:"inherit",fontSize:10,fontWeight:"bold",letterSpacing:2,cursor:"pointer"}}>
+                ))
+              )}
+              {openTrades.length > 0 && (
+                <button onClick={() => onCloseAll('all')} className="w-full mt-2 py-2 bg-white/5 border border-purple-500/30 text-purple-300 text-xs rounded">
                   CLOSE ALL POSITIONS
                 </button>
               )}
-
-              <div style={{display:"flex",gap:8,marginTop:14}}>
-                <button onClick={()=>setTab("deposit")} style={{flex:1,padding:"11px",borderRadius:8,
-                  background:"#06101a",border:"1.5px solid #38bdf8",color:"#38bdf8",
-                  fontFamily:"inherit",fontSize:10,fontWeight:"bold",letterSpacing:2,cursor:"pointer"}}>
+              <div className="flex gap-2 mt-4">
+                <button onClick={() => setTab('deposit')} className="flex-1 py-2 bg-cyan-500/10 border border-cyan-500 text-cyan-400 text-xs rounded">
                   ↓ DEPOSIT
                 </button>
-                <button onClick={()=>setTab("withdraw")} style={{flex:1,padding:"11px",borderRadius:8,
-                  background:"#0e0618",border:"1.5px solid #a78bfa",color:"#a78bfa",
-                  fontFamily:"inherit",fontSize:10,fontWeight:"bold",letterSpacing:2,cursor:"pointer"}}>
+                <button onClick={() => setTab('withdraw')} className="flex-1 py-2 bg-purple-500/10 border border-purple-500 text-purple-400 text-xs rounded">
                   ↑ WITHDRAW
                 </button>
               </div>
-            </div>
+            </>
           )}
 
-          {/* ── DEPOSIT ── */}
-          {tab==="deposit" && (
-            <div>
-              <div style={{background:"#060614",border:"1px solid #1a2040",borderRadius:8,padding:"12px 14px",marginBottom:16}}>
-                <div style={{color:"#38bdf8",fontSize:9,fontWeight:"bold",letterSpacing:2,marginBottom:5}}>ℹ SIMULATION DEPOSIT</div>
-                <div style={{color:"#a0a0c8",fontSize:"9.5px",lineHeight:1.65}}>
-                  Deposit virtual ZAR to your simulation account. No real money is involved. Start trading immediately after depositing.
-                </div>
+          {tab === 'deposit' && (
+            <>
+              <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-4">
+                <div className="text-cyan-400 text-[9px] font-bold tracking-wider mb-1">ℹ SIMULATION DEPOSIT</div>
+                <div className="text-white/60 text-[9px]">Deposit virtual ZAR to start trading.</div>
               </div>
-              <div style={{marginBottom:16}}>
-                <div style={{color:"#8888b8",fontSize:8,letterSpacing:2,marginBottom:8}}>AMOUNT (ZAR)</div>
-                <div style={{position:"relative"}}>
-                  <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"#6060a0",fontSize:13,fontWeight:"bold",pointerEvents:"none"}}>R</span>
-                  <input type="number" value={amount} onChange={e=>setAmount(e.target.value)}
+              <div className="mb-4">
+                <div className="text-white/40 text-[8px] tracking-wider mb-2">AMOUNT (ZAR)</div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60 text-sm font-bold">R</span>
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
                     placeholder="0.00"
-                    style={{width:"100%",padding:"12px 12px 12px 30px",borderRadius:8,boxSizing:"border-box",
-                      background:"#0a0a1e",border:"1.5px solid #2a2a58",color:"#e8e8ff",
-                      fontSize:17,fontFamily:"'Courier New',monospace",outline:"none",
-                      WebkitAppearance:"none",MozAppearance:"textfield"}}/>
+                    className="w-full pl-8 pr-3 py-3 bg-black/20 border border-white/20 rounded-lg text-white text-base font-mono focus:outline-none focus:border-cyan-500"
+                  />
                 </div>
-                <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
-                  {[500,1000,2500,5000,10000].map(q=>(
-                    <button key={q} onClick={()=>setAmount(String(q))} style={{
-                      padding:"5px 10px",borderRadius:5,cursor:"pointer",fontFamily:"inherit",fontSize:9,
-                      border:`1px solid ${amount===String(q)?"#38bdf8":"#2a2a58"}`,
-                      background:amount===String(q)?"#38bdf822":"#0a0a1e",
-                      color:amount===String(q)?"#38bdf8":"#7070a8",transition:"all 0.1s",
-                    }}>R{q.toLocaleString()}</button>
+                <div className="flex gap-1.5 mt-2 flex-wrap">
+                  {[500, 1000, 2500, 5000, 10000].map(q => (
+                    <button key={q} onClick={() => setAmount(String(q))} className="px-2 py-1 text-[10px] rounded border border-white/20 text-white/60 hover:border-white/40">
+                      R{q.toLocaleString()}
+                    </button>
                   ))}
                 </div>
               </div>
-              <button onClick={doDeposit} style={{width:"100%",padding:"13px",borderRadius:10,
-                background:"linear-gradient(135deg,#052e16,#065f2a)",border:"2px solid #22c55e",
-                color:"#4ade80",fontFamily:"inherit",fontSize:12,fontWeight:"bold",letterSpacing:3,cursor:"pointer"}}>
+              <button onClick={doDeposit} className="w-full py-3 bg-green-500/20 border border-green-500 text-green-400 font-bold text-xs rounded">
                 ↓ DEPOSIT FUNDS
               </button>
-              <div style={{color:"#2a2a50",fontSize:8,textAlign:"center",marginTop:8,letterSpacing:1}}>MIN R100 · DEMO ONLY · NO REAL FUNDS</div>
-            </div>
+            </>
           )}
 
-          {/* ── WITHDRAW ── */}
-          {tab==="withdraw" && (
-            <div>
-              <div style={{background:"#0e0618",border:`1px solid ${openTrades.length?"#3a1a1a":"#2a1a48"}`,borderRadius:8,padding:"12px 14px",marginBottom:16}}>
-                <div style={{color:"#a78bfa",fontSize:9,fontWeight:"bold",letterSpacing:2,marginBottom:4}}>AVAILABLE TO WITHDRAW</div>
-                <div style={{color:"#e0d8ff",fontSize:16,fontWeight:"bold"}}>{fmt(balance)}</div>
-                {openTrades.length>0 &&
-                  <div style={{color:"#f87171",fontSize:9,marginTop:8,letterSpacing:1}}>
-                    ⚠ Close your {openTrades.length} open position{openTrades.length>1?"s":""} first
-                  </div>
-                }
+          {tab === 'withdraw' && (
+            <>
+              <div className="bg-black/20 border border-white/10 rounded-lg p-3 mb-4">
+                <div className="text-purple-400 text-[9px] font-bold tracking-wider mb-1">AVAILABLE TO WITHDRAW</div>
+                <div className="text-white text-base font-bold">{fmt(balance)}</div>
               </div>
-              <div style={{marginBottom:16}}>
-                <div style={{color:"#8888b8",fontSize:8,letterSpacing:2,marginBottom:8}}>AMOUNT (ZAR)</div>
-                <div style={{position:"relative"}}>
-                  <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"#6060a0",fontSize:13,fontWeight:"bold",pointerEvents:"none"}}>R</span>
-                  <input type="number" value={amount} onChange={e=>setAmount(e.target.value)}
+              <div className="mb-4">
+                <div className="text-white/40 text-[8px] tracking-wider mb-2">AMOUNT (ZAR)</div>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/60 text-sm font-bold">R</span>
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
                     placeholder="0.00"
-                    style={{width:"100%",padding:"12px 12px 12px 30px",borderRadius:8,boxSizing:"border-box",
-                      background:"#0a0a1e",border:"1.5px solid #2a2a58",color:"#e8e8ff",
-                      fontSize:17,fontFamily:"'Courier New',monospace",outline:"none",
-                      WebkitAppearance:"none",MozAppearance:"textfield"}}/>
+                    className="w-full pl-8 pr-3 py-3 bg-black/20 border border-white/20 rounded-lg text-white text-base font-mono focus:outline-none focus:border-purple-500"
+                  />
                 </div>
-                <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
-                  {[500,1000,2500,5000,10000].map(q=>(
-                    <button key={q} onClick={()=>setAmount(String(q))} style={{
-                      padding:"5px 10px",borderRadius:5,cursor:"pointer",fontFamily:"inherit",fontSize:9,
-                      border:`1px solid ${amount===String(q)?"#38bdf8":"#2a2a58"}`,
-                      background:amount===String(q)?"#38bdf822":"#0a0a1e",
-                      color:amount===String(q)?"#38bdf8":"#7070a8",transition:"all 0.1s",
-                    }}>R{q.toLocaleString()}</button>
+                <div className="flex gap-1.5 mt-2 flex-wrap">
+                  {[500, 1000, 2500, 5000, 10000].map(q => (
+                    <button key={q} onClick={() => setAmount(String(q))} className="px-2 py-1 text-[10px] rounded border border-white/20 text-white/60 hover:border-white/40">
+                      R{q.toLocaleString()}
+                    </button>
                   ))}
                 </div>
               </div>
-              <button onClick={doWithdraw} disabled={openTrades.length>0} style={{width:"100%",padding:"13px",borderRadius:10,
-                background:openTrades.length?"#08081a":"linear-gradient(135deg,#1a054a,#3b0764)",
-                border:`2px solid ${openTrades.length?"#2a2a50":"#a78bfa"}`,
-                color:openTrades.length?"#3a3a60":"#ddd6fe",
-                fontFamily:"inherit",fontSize:12,fontWeight:"bold",letterSpacing:3,
-                cursor:openTrades.length?"not-allowed":"pointer",opacity:openTrades.length?0.5:1}}>
+              <button onClick={doWithdraw} disabled={openTrades.length > 0} className="w-full py-3 bg-purple-500/20 border border-purple-500 text-purple-400 font-bold text-xs rounded disabled:opacity-50">
                 ↑ WITHDRAW FUNDS
               </button>
-              <div style={{color:"#2a2a50",fontSize:8,textAlign:"center",marginTop:8,letterSpacing:1}}>MIN R100 · DEMO ONLY · NO REAL FUNDS</div>
-            </div>
+            </>
           )}
 
-          {/* ── HISTORY ── */}
-          {tab==="history" && (
-            <div>
-              <div style={{color:"#6060a0",fontSize:8,letterSpacing:2,marginBottom:14}}>TRANSACTION HISTORY</div>
-              {txHistory.length===0 ? (
-                <div style={{textAlign:"center",padding:"28px 0",color:"#2a2a50",fontSize:10}}>No transactions yet</div>
-              ) : txHistory.map(h=>(
-                <div key={h.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid #0d0d28"}}>
-                  <div style={{display:"flex",alignItems:"center",gap:10}}>
-                    <div style={{width:28,height:28,borderRadius:"50%",
-                      background:h.type==="DEPOSIT"?"#052e1628":"#1a054a28",
-                      border:`1px solid ${h.type==="DEPOSIT"?"#22c55e":"#a78bfa"}`,
-                      display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,flexShrink:0}}>
-                      {h.type==="DEPOSIT"?"↓":"↑"}
+          {tab === 'history' && (
+            <>
+              <div className="text-white/40 text-[8px] tracking-wider mb-3">TRANSACTION HISTORY</div>
+              {txHistory.length === 0 ? (
+                <div className="text-center py-8 text-white/20 text-xs">No transactions yet</div>
+              ) : (
+                <div className="space-y-2">
+                  {txHistory.map(tx => (
+                    <div key={tx.id} className="flex justify-between items-center py-2 border-b border-white/10">
+                      <div>
+                        <div className={`text-[10px] font-bold ${tx.type === 'DEPOSIT' ? 'text-green-400' : 'text-purple-400'}`}>{tx.type}</div>
+                        <div className="text-white/30 text-[7px]">{new Date(tx.created_at).toLocaleDateString()}</div>
+                      </div>
+                      <div className={`text-xs font-bold ${tx.type === 'DEPOSIT' ? 'text-green-400' : 'text-purple-400'}`}>
+                        {tx.type === 'DEPOSIT' ? '+' : '-'}{fmt(Math.abs(tx.amount))}
+                      </div>
                     </div>
-                    <div>
-                      <div style={{color:h.type==="DEPOSIT"?"#4ade80":"#c4b5fd",fontSize:10,fontWeight:"bold",letterSpacing:1}}>{h.type}</div>
-                      <div style={{color:"#3a3a60",fontSize:8,marginTop:2}}>{h.date} · {h.note}</div>
-                    </div>
-                  </div>
-                  <div style={{color:h.type==="DEPOSIT"?"#4ade80":"#c4b5fd",fontSize:12,fontWeight:"bold"}}>
-                    {h.type==="DEPOSIT"?"+":"-"}{fmt(h.amount)}
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
-
         </div>
       </div>
     </div>

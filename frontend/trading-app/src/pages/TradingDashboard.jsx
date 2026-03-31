@@ -1,153 +1,215 @@
-import { useState, useEffect, useRef } from "react";
-import { SYMBOLS, LOT_SIZES, USD_TO_ZAR, C } from "../constants";
-import { walletAPI, pricesAPI, ordersAPI, tradesAPI, subscriptionAPI } from "../services/api";
-import CandleChart from "../components/CandleChart";
-import PeterModal from "../components/PeterModal";
-import WalletModal from "../components/WalletModal";
+import React, { useState, useEffect, useRef } from 'react';
+import { SYMBOLS, LOT_SIZES, USD_TO_ZAR } from '../constants';
+import { walletAPI, pricesAPI, ordersAPI, tradesAPI } from '../services/api';
+import CandleChart from '../components/CandleChart';
+import WalletModal from '../components/WalletModal';
 import BottomNav from '../../../shell/src/components/BottomNav';
 
-export default function TradingDashboard() {
-  const [market,       setMarket]       = useState("Forex");
-  const [symbol,       setSymbol]       = useState("USD/ZAR");
-  const [marketOpen,   setMarketOpen]   = useState(false);
-  const [symbolOpen,   setSymbolOpen]   = useState(false);
-  const [lotSize,      setLotSize]      = useState(null);
-  const [volume,       setVolume]       = useState(1);
-  const [entry,        setEntry]        = useState(null);
-  const [takeProfit,   setTakeProfit]   = useState(null);
-  const [stopLoss,     setStopLoss]     = useState(null);
-  const [livePrice,    setLivePrice]    = useState(0);
-  const [chartPrice,   setChartPrice]   = useState(0);
-  const [toast,        setToast]        = useState(null);
-  const [resultToast,  setResultToast]  = useState(null);
-  const [showPeter,    setShowPeter]    = useState(false);
-  const [peterUsage,   setPeterUsage]   = useState(0);
-  const [isSubscribed, setIsSubscribed] = useState(false);
-  const [showWallet,   setShowWallet]   = useState(false);
-  const [balance,          setBalance]          = useState(0);
-  const [availableBalance, setAvailableBalance] = useState(0);
-  const [openTrades,       setOpenTrades]       = useState([]);
-  const [pendingOrders,    setPendingOrders]    = useState([]);
+// ─── Drawing Tools Sidebar ────────────────────────────────────────────────────
+const DRAW_TOOLS = [
+  {
+    id: 'cursor',
+    label: 'Cursor',
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M3 2l10 5.5-5.5 1L5 14z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'trendline',
+    label: 'Trend Line',
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <line x1="2" y1="14" x2="14" y2="2" stroke="currentColor" strokeWidth="1.2"/>
+        <circle cx="2" cy="14" r="1.5" fill="currentColor"/>
+        <circle cx="14" cy="2" r="1.5" fill="currentColor"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'hline',
+    label: 'Horizontal Line',
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <line x1="1" y1="8" x2="15" y2="8" stroke="currentColor" strokeWidth="1.2"/>
+        <line x1="1" y1="5" x2="1" y2="11" stroke="currentColor" strokeWidth="1.2"/>
+        <line x1="15" y1="5" x2="15" y2="11" stroke="currentColor" strokeWidth="1.2"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'vline',
+    label: 'Vertical Line',
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <line x1="8" y1="1" x2="8" y2="15" stroke="currentColor" strokeWidth="1.2"/>
+        <line x1="5" y1="1" x2="11" y2="1" stroke="currentColor" strokeWidth="1.2"/>
+        <line x1="5" y1="15" x2="11" y2="15" stroke="currentColor" strokeWidth="1.2"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'rect',
+    label: 'Rectangle',
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <rect x="2" y="3" width="12" height="10" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'fib',
+    label: 'Fibonacci',
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <text x="1" y="12" fontSize="8" fill="currentColor" fontFamily="monospace">Fib</text>
+      </svg>
+    ),
+  },
+  {
+    id: 'text',
+    label: 'Text',
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <text x="4" y="13" fontSize="12" fill="currentColor" fontFamily="monospace">T</text>
+      </svg>
+    ),
+  },
+  { id: 'divider', label: '', svg: null },
+  {
+    id: 'zoom',
+    label: 'Magnify',
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+        <line x1="10.5" y1="10.5" x2="15" y2="15" stroke="currentColor" strokeWidth="1.2"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'arc',
+    label: 'Arc',
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <path d="M2 13 Q8 2 14 13" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+      </svg>
+    ),
+  },
+  {
+    id: 'ruler',
+    label: 'Ruler',
+    svg: (
+      <svg width="16" height="16" viewBox="0 0 16 16">
+        <line x1="8" y1="2" x2="8" y2="14" stroke="currentColor" strokeWidth="1.2"/>
+        <line x1="4" y1="5" x2="12" y2="5" stroke="currentColor" strokeWidth="0.8"/>
+        <line x1="4" y1="8" x2="12" y2="8" stroke="currentColor" strokeWidth="0.8"/>
+        <line x1="4" y1="11" x2="12" y2="11" stroke="currentColor" strokeWidth="0.8"/>
+      </svg>
+    ),
+  },
+];
 
-  // displayPrice: chart drift price (400ms) when available, else real API price
+function DrawingToolbar({ activeTool, onToolSelect }) {
+  return (
+    <div className="flex flex-col items-center py-2 gap-0.5 bg-[#060612] border-r border-[#1e1e3a] w-8 shrink-0">
+      {DRAW_TOOLS.map((tool, i) => {
+        if (tool.id === 'divider') {
+          return <div key={`div-${i}`} className="w-4 h-px bg-[#1e1e3a] my-0.5" />;
+        }
+        const isActive = activeTool === tool.id;
+        return (
+          <button
+            key={tool.id}
+            title={tool.label}
+            onClick={() => onToolSelect(tool.id)}
+            className={`
+              w-6 h-6 flex items-center justify-center rounded transition-all duration-150
+              ${isActive
+                ? 'bg-[#38bdf820] text-[#38bdf8] border border-[#38bdf850]'
+                : 'text-[#3a3a6a] hover:text-[#8888c0] hover:bg-[#1a1a2e] border border-transparent'}
+            `}
+          >
+            {tool.svg}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+export default function TradingDashboard() {
+  const [market, setMarket] = useState('Forex');
+  const [symbol, setSymbol] = useState('USD/ZAR');
+  const [marketOpen, setMarketOpen] = useState(false);
+  const [symbolOpen, setSymbolOpen] = useState(false);
+  const [lotSize, setLotSize] = useState(null);
+  const [volume, setVolume] = useState(1);
+  const [entry, setEntry] = useState(null);
+  const [takeProfit, setTakeProfit] = useState(null);
+  const [stopLoss, setStopLoss] = useState(null);
+  const [livePrice, setLivePrice] = useState(0);
+  const [chartPrice, setChartPrice] = useState(0);
+  const [toast, setToast] = useState(null);
+  const [showWallet, setShowWallet] = useState(false);
+  const [balance, setBalance] = useState(0);
+  const [availableBalance, setAvailableBalance] = useState(0);
+  const [openTrades, setOpenTrades] = useState([]);
+  const [pendingOrders, setPendingOrders] = useState([]);
+  const [showActivationModal, setShowActivationModal] = useState(false);
+  const [activationDetails, setActivationDetails] = useState(null);
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [resultDetails, setResultDetails] = useState(null);
+  const [showControls, setShowControls] = useState(false);
+  const [timeframe, setTimeframe] = useState('1H');
+  const [activeTool, setActiveTool] = useState('cursor');
+
   const displayPrice = chartPrice > 0 ? chartPrice : livePrice;
 
-  // ── Refs ───────────────────────────────────────────────────────────────────
   const activatingOrdersRef = useRef(new Set());
-  const closingTradesRef    = useRef(new Set());
-  const peterApplyingRef    = useRef(false);
-  const livePriceRef        = useRef(0);
-  const isPlacingRef        = useRef(false);
+  const closingTradesRef = useRef(new Set());
+  const livePriceRef = useRef(0);
+  const apiPriceRef = useRef(0);
+  const isPlacingRef = useRef(false);
 
-  // Keep ref in sync with chart drift price so P&L monitor uses smoothed price
   useEffect(() => { livePriceRef.current = displayPrice; }, [displayPrice]);
 
-  // ── Subscription ───────────────────────────────────────────────────────────
-  const fetchSubscription = async () => {
-    try {
-      const res = await subscriptionAPI.me();
-      setIsSubscribed(res.data.can_use_peter === true && res.data.plan !== "FREE");
-    } catch (e) {
-      setIsSubscribed(false);
-    }
-  };
-  useEffect(() => { fetchSubscription(); }, []);
-
-  // ── Wallet ─────────────────────────────────────────────────────────────────
   const fetchWallet = async () => {
     try {
-      const res   = await walletAPI.get();
-      const bal   = Number(res.data.balance ?? 0);
-      const avail = Number(res.data.available_balance ?? res.data.balance ?? 0);
-      setBalance(bal);
-      setAvailableBalance(avail);
-    } catch (e) {
-      console.error("fetchWallet:", e);
-    }
+      const res = await walletAPI.get();
+      setBalance(res.data.balance);
+      setAvailableBalance(res.data.available);
+    } catch (e) { console.error('fetchWallet:', e); }
   };
-  useEffect(() => {
-    fetchWallet();
-    const retryId = setTimeout(fetchWallet, 1500);
-    return () => clearTimeout(retryId);
-  }, []);
 
-  // ── Pending orders ─────────────────────────────────────────────────────────
   const fetchPending = async () => {
     try {
-      const res    = await ordersAPI.pending();
-      const orders = (res.data ?? [])
-        .filter(o => !activatingOrdersRef.current.has(o.id))
-        .map(o => ({
-          id:         o.id,
-          type:       o.order_type,
-          symbol:     o.symbol,
-          market:     o.market,
-          lot:        o.lot_size,
-          vol:        o.volume,
-          entryPrice: Number(o.entry_price),
-          tpPrice:    o.tp_price ? Number(o.tp_price) : null,
-          slPrice:    o.sl_price ? Number(o.sl_price) : null,
-          entryStr:   String(o.entry_price),
-          tpStr:      o.tp_price ? String(o.tp_price) : null,
-          slStr:      o.sl_price ? String(o.sl_price) : null,
-          margin:     Number(o.margin ?? 0),
-          pnl: 0, pips: 0, status: "pending",
-        }));
-      setPendingOrders(orders);
-    } catch (e) {
-      console.error("fetchPending:", e);
-    }
+      const res = await ordersAPI.pending();
+      setPendingOrders(res.data);
+    } catch (e) { console.error('fetchPending:', e); }
   };
 
-  // ── Open trades ────────────────────────────────────────────────────────────
   const fetchTrades = async () => {
     try {
-      const res    = await tradesAPI.open();
-      const trades = (res.data ?? []).map(t => ({
-        ...t,
-        type:       t.trade_type,
-        lot:        t.lot_size,
-        vol:        t.volume,
-        entryPrice: Number(t.entry_price),
-        tpPrice:    t.tp_price ? Number(t.tp_price) : null,
-        slPrice:    t.sl_price ? Number(t.sl_price) : null,
-        entryStr:   String(t.entry_price),
-        tpStr:      t.tp_price ? String(t.tp_price) : null,
-        slStr:      t.sl_price ? String(t.sl_price) : null,
-        pnl:    0,
-        pips:   0,
-        margin: Number(t.margin ?? 0),
-        status: "active",
-      }));
-      setOpenTrades(trades);
-    } catch (e) {
-      console.error("fetchTrades:", e);
-    }
+      const res = await tradesAPI.open();
+      setOpenTrades(res.data);
+    } catch (e) { console.error('fetchTrades:', e); }
   };
 
-  // ── Poll trades + wallet ───────────────────────────────────────────────────
   useEffect(() => {
-    fetchTrades();
-    fetchPending();
-    fetchWallet();
-    const id = setInterval(() => {
-      fetchTrades();
-      fetchWallet();
-      fetchPending();
-    }, 8000);
+    fetchWallet(); fetchPending(); fetchTrades();
+    const id = setInterval(() => { fetchWallet(); fetchPending(); fetchTrades(); }, 5000);
     return () => clearInterval(id);
   }, []);
 
-  // ── Real-time price — poll backend every 2s ────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     const fetchPrice = async () => {
       try {
         const res = await pricesAPI.get(symbol);
-        const p   = res.data?.price;
-        console.log('Price fetched:', p); 
-        if (p && p > 0 && !cancelled) setLivePrice(p);
-         console.log('Fetched price:', p);
+        const p = res.data?.price;
+        if (p && p > 0 && !cancelled) { setLivePrice(p); apiPriceRef.current = p; }
       } catch (e) {}
     };
     fetchPrice();
@@ -155,32 +217,27 @@ export default function TradingDashboard() {
     return () => { cancelled = true; clearInterval(id); };
   }, [symbol]);
 
-  // ── Price monitor — entry activation + P&L + TP/SL auto-close ─────────────
   useEffect(() => {
     const id = setInterval(() => {
-      const cur = livePriceRef.current;
+      const cur = apiPriceRef.current;
       if (!cur) return;
 
       setPendingOrders(prev => {
-        if (prev.length === 0) return prev;
         const stillPending = [];
         for (const o of prev) {
           const entryHit =
-            (o.type === "BUY"  && cur >= o.entryPrice) ||
-            (o.type === "SELL" && cur <= o.entryPrice);
-          if (entryHit) {
-            if (!activatingOrdersRef.current.has(o.id)) {
-              activatingOrdersRef.current.add(o.id);
-              setToast({ type:"ENTRY_HIT", id:Date.now(), symbol:o.symbol, tradeType:o.type, entryStr:o.entryStr, tpStr:o.tpStr||"–", slStr:o.slStr||"–", lot:o.lot, vol:o.vol });
-              setTimeout(() => setToast(p => p?.type === "ENTRY_HIT" ? null : p), 4000);
-              ordersAPI.activate(o.id, cur)
-                .then(() => { fetchTrades(); fetchWallet(); })
-                .catch(() => {})
-                .finally(() => { activatingOrdersRef.current.delete(o.id); fetchPending(); });
-            }
-          } else {
-            stillPending.push(o);
-          }
+            (o.direction === 'BUY' && cur >= o.entry_price) ||
+            (o.direction === 'SELL' && cur <= o.entry_price);
+          if (entryHit && !activatingOrdersRef.current.has(o.id)) {
+            activatingOrdersRef.current.add(o.id);
+            setActivationDetails({ id: o.id, symbol: o.symbol, direction: o.direction, entryPrice: o.entry_price, tp: o.take_profit, sl: o.stop_loss, lot: o.lot_size, volume: o.volume });
+            setShowActivationModal(true);
+            setTimeout(() => setShowActivationModal(false), 4000);
+            ordersAPI.activate(o.id, cur)
+              .then(() => { fetchTrades(); fetchWallet(); })
+              .catch(() => {})
+              .finally(() => { activatingOrdersRef.current.delete(o.id); fetchPending(); });
+          } else { stillPending.push(o); }
         }
         return stillPending;
       });
@@ -188,40 +245,33 @@ export default function TradingDashboard() {
       setOpenTrades(prev => {
         const remaining = [];
         for (const t of prev) {
-          const pip    = cur < 10 ? 0.0001 : cur < 200 ? 0.0001 : 1;
-          const diff   = t.type === "BUY" ? cur - t.entryPrice : t.entryPrice - cur;
-          const pips   = Math.round(diff / pip);
-          const pipVal = LOT_SIZES.find(l => l.label === t.lot)?.pip ?? 1;
-          const pnl    = (diff / pip) * pipVal * t.vol * (t.symbol.includes("ZAR") ? 1 : USD_TO_ZAR);
+          const pip = cur < 10 ? 0.0001 : cur < 200 ? 0.0001 : 1;
+          const diff = t.direction === 'BUY' ? cur - t.entry_price : t.entry_price - cur;
+          const pips = Math.round(diff / pip);
+          const pipVal = LOT_SIZES.find(l => l.label === t.lot_size)?.pipValue ?? 1;
+          const pnl = (diff / pip) * pipVal * t.volume * (t.symbol.includes('ZAR') ? 1 : USD_TO_ZAR);
           const updated = { ...t, pnl, pips };
 
-          const tpHit = t.tpPrice != null && (
-            (t.type === "BUY"  && cur >= t.tpPrice) ||
-            (t.type === "SELL" && cur <= t.tpPrice)
-          );
-          const slHit = t.slPrice != null && (
-            (t.type === "BUY"  && cur <= t.slPrice) ||
-            (t.type === "SELL" && cur >= t.slPrice)
-          );
+          const tpHit = t.take_profit != null && ((t.direction === 'BUY' && cur >= t.take_profit) || (t.direction === 'SELL' && cur <= t.take_profit));
+          const slHit = t.stop_loss != null && ((t.direction === 'BUY' && cur <= t.stop_loss) || (t.direction === 'SELL' && cur >= t.stop_loss));
 
           if (tpHit || slHit) {
             if (closingTradesRef.current.has(t.id)) continue;
             closingTradesRef.current.add(t.id);
-            const pip2    = t.tpPrice != null
-              ? Math.abs(Math.round((t.tpPrice - t.entryPrice) / pip))
-              : Math.abs(Math.round((t.slPrice - t.entryPrice) / pip));
-            const realPnl  = tpHit ? Math.abs(pnl) : -Math.abs(pnl);
-            const hitPrice = tpHit ? t.tpPrice : t.slPrice;
-            const reason   = tpHit ? "TP" : "SL";
+            const pip2 = t.take_profit != null
+              ? Math.abs(Math.round((t.take_profit - t.entry_price) / pip))
+              : Math.abs(Math.round((t.stop_loss - t.entry_price) / pip));
+            const realPnl = tpHit ? Math.abs(pnl) : -Math.abs(pnl);
+            const hitPrice = tpHit ? t.take_profit : t.stop_loss;
+            const reason = tpHit ? 'TP' : 'SL';
             tradesAPI.close(t.id, hitPrice, reason)
               .then(() => { fetchTrades(); fetchWallet(); })
-              .catch(() => { closingTradesRef.current.delete(t.id); })
+              .catch(() => {})
               .finally(() => { closingTradesRef.current.delete(t.id); });
-            setResultToast({ id:Date.now(), hit:reason, pnl:realPnl, symbol:t.symbol, tradeType:t.type, pips:pip2 });
-            setTimeout(() => setResultToast(null), 5000);
-          } else {
-            remaining.push(updated);
-          }
+            setResultDetails({ hit: reason, pnl: realPnl, symbol: t.symbol, direction: t.direction, pips: pip2, entryPrice: t.entry_price, closePrice: hitPrice });
+            setShowResultModal(true);
+            setTimeout(() => setShowResultModal(false), 5000);
+          } else { remaining.push(updated); }
         }
         return remaining;
       });
@@ -229,577 +279,518 @@ export default function TradingDashboard() {
     return () => clearInterval(id);
   }, []);
 
-  // ── Derived balances ───────────────────────────────────────────────────────
-  const totalPnl       = openTrades.reduce((s, t) => s + (isNaN(t.pnl) ? 0 : t.pnl), 0);
+  const totalPnl = openTrades.reduce((s, t) => s + (isNaN(t.pnl) ? 0 : t.pnl), 0);
   const currentBalance = (isNaN(balance) ? 0 : balance) + totalPnl;
 
-  // ── Formatters ─────────────────────────────────────────────────────────────
   const balFmt = v => {
     const n = Number(v);
-    if (isNaN(n)) return "ZAR 0,00";
-    const abs = Math.abs(n).toLocaleString("en-ZA", { minimumFractionDigits:2, maximumFractionDigits:2 });
-    return (n < 0 ? "−" : "") + `ZAR ${abs}`;
+    if (isNaN(n)) return '0.00';
+    return n.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
-  const zarFmt   = v => v != null ? `ZAR ${Math.abs(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}` : "ZAR 0,00";
+
   const priceFmt = v => {
-    if (v == null) return "–";
+    if (v == null) return '–';
     return displayPrice > 10000
-      ? v.toLocaleString("en-ZA", { minimumFractionDigits:2 })
+      ? v.toLocaleString('en-ZA', { minimumFractionDigits: 2 })
       : displayPrice > 100 ? v.toFixed(2) : v.toFixed(4);
   };
 
-  // ── Pip / ZAR calc ─────────────────────────────────────────────────────────
-  const calcPips = (a, b) => {
-  if (a == null || b == null) return null;
-  const diff = Math.abs(a - b);
-  if (!diff) return null;
-  const pip     = displayPrice < 10 ? 0.0001 : displayPrice < 200 ? 0.0001 : 1;
-  const pips    = diff / pip;
-  const activeLot = lotSize ?? LOT_SIZES.find(l => l.label === "Mini");  // default to Mini
-  const zar     = pips * (activeLot?.pip ?? 1) * volume * (symbol.includes("ZAR") ? 1 : USD_TO_ZAR);
-  return { pips: Math.round(pips), zar };
-  };
-  
-  const profitCalc = calcPips(entry, takeProfit);
-  const lossCalc   = calcPips(entry, stopLoss);
+  const priceChange = (() => {
+    const base = 18.5;
+    const change = ((displayPrice - base) / base) * 100;
+    return change.toFixed(2);
+  })();
 
-  const tradeDirection = entry != null && takeProfit != null ? (takeProfit > entry ? "BUY" : "SELL") : null;
-  const canBuy  = tradeDirection === null || tradeDirection === "BUY";
-  const canSell = tradeDirection === null || tradeDirection === "SELL";
+  const calcPips = (a, b) => {
+    if (a == null || b == null) return null;
+    const diff = Math.abs(a - b);
+    if (!diff) return null;
+    const pip = displayPrice < 10 ? 0.0001 : displayPrice < 200 ? 0.0001 : 1;
+    const pips = diff / pip;
+    const activeLot = lotSize ?? LOT_SIZES.find(l => l.label === 'Mini');
+    const zar = pips * (activeLot?.pipValue ?? 1) * volume * (symbol.includes('ZAR') ? 1 : USD_TO_ZAR);
+    return { pips: Math.round(pips), zar };
+  };
+
+  const profitCalc = calcPips(entry, takeProfit);
+  const lossCalc = calcPips(entry, stopLoss);
+
+  const tradeDirection = entry != null && takeProfit != null ? (takeProfit > entry ? 'BUY' : 'SELL') : null;
+  const canBuy = tradeDirection === null || tradeDirection === 'BUY';
+  const canSell = tradeDirection === null || tradeDirection === 'SELL';
 
   const resetOrder = () => { setEntry(null); setTakeProfit(null); setStopLoss(null); setLotSize(null); setVolume(1); };
 
-  // ── Close one or all trades ────────────────────────────────────────────────
   const handleCloseTrade = async (idOrAll) => {
     try {
-      if (idOrAll === "all") {
+      if (idOrAll === 'all') {
         for (const o of pendingOrders) await ordersAPI.cancel(o.id).catch(() => {});
         setPendingOrders([]);
         await tradesAPI.closeAll();
+        resetOrder();
       } else {
         const isPending = pendingOrders.some(o => o.id === idOrAll);
-        if (isPending) {
-          await ordersAPI.cancel(idOrAll);
-          setPendingOrders(prev => prev.filter(o => o.id !== idOrAll));
-        } else {
-          await tradesAPI.close(idOrAll);
-        }
+        if (isPending) { await ordersAPI.cancel(idOrAll); setPendingOrders(prev => prev.filter(o => o.id !== idOrAll)); resetOrder(); }
+        else { await tradesAPI.close(idOrAll); resetOrder(); }
       }
-      await fetchTrades();
-      await fetchWallet();
-      await fetchPending();
+      await fetchTrades(); await fetchWallet(); await fetchPending();
     } catch (e) {
-      console.error("handleCloseTrade:", e);
-      await fetchTrades();
-      await fetchWallet();
-      await fetchPending();
+      console.error('handleCloseTrade:', e);
+      await fetchTrades(); await fetchWallet(); await fetchPending();
     }
   };
 
-  // ── Place limit order ──────────────────────────────────────────────────────
   const handleTrade = async type => {
     if (isPlacingRef.current) return;
-    if (type === "BUY"  && !canBuy)  return;
-    if (type === "SELL" && !canSell) return;
+    if (type === 'BUY' && !canBuy) return;
+    if (type === 'SELL' && !canSell) return;
     if (availableBalance <= 0) {
-      setToast({ type:"NOFUNDS", id:Date.now() });
+      setToast({ type: 'NOFUNDS', id: Date.now() });
       setTimeout(() => setToast(null), 3000);
       return;
     }
-    const lot = lotSize?.label ?? "Mini";
+    const lot = lotSize?.label ?? 'Mini';
     const vol = volume;
     const cur = livePriceRef.current;
     const dec = cur > 10000 ? 2 : cur > 100 ? 2 : 4;
-    const defaultEntry = type === "BUY"
+    const defaultEntry = type === 'BUY'
       ? parseFloat((cur * 1.002).toFixed(dec))
       : parseFloat((cur * 0.998).toFixed(dec));
     const entryP = entry ?? defaultEntry;
     try {
       isPlacingRef.current = true;
-      const res = await ordersAPI.place({
-        symbol, market,
-        direction: type,  
-        order_type:  type,
-        lot_size:    lot,
-        volume:      vol,
-        entry_price: entryP,
-        tp_price:    takeProfit ?? undefined,
-        sl_price:    stopLoss   ?? undefined,
-      });
-      const id     = res.data.id;
-      const pipVal = LOT_SIZES.find(l => l.label === lot)?.pip ?? 1;
-      const margin = Math.max(50, pipVal * vol * 20);
-      const localOrder = {
-        id, type, symbol, lot, vol, margin,
-        entryPrice: entryP,
-        entryStr:   priceFmt(entryP),
-        tpStr:      takeProfit != null ? priceFmt(takeProfit) : null,
-        slStr:      stopLoss   != null ? priceFmt(stopLoss)   : null,
-        tpPrice: takeProfit, slPrice: stopLoss,
-        pnl: 0, pips: 0, status: "pending",
-      };
-      fetchWallet();
-      fetchPending();
-      setToast({ type:"PENDING", id, symbol, tradeType:type, entryStr:localOrder.entryStr, tpStr:localOrder.tpStr||"–", slStr:localOrder.slStr||"–", lot, vol });
-      setTimeout(() => setToast(p => p?.id === id ? null : p), 4000);
-      resetOrder();
+      const res = await ordersAPI.place({ symbol, direction: type, lot_size: lot, volume: vol, entry_price: entryP, take_profit: takeProfit ?? undefined, stop_loss: stopLoss ?? undefined });
+      fetchWallet(); fetchPending();
+      setToast({ type: 'PENDING', id: res.data.id, symbol, tradeType: type, entryStr: priceFmt(entryP), lot, vol });
+      setTimeout(() => setToast(null), 4000);
     } catch (err) {
-      console.error("handleTrade:", err.response?.data?.detail || err);
-      setToast({ type:"NOFUNDS", id:Date.now() });
+      console.error('handleTrade:', err.response?.data?.detail || err);
+      setToast({ type: 'NOFUNDS', id: Date.now() });
       setTimeout(() => setToast(null), 3000);
-    } finally {
-      isPlacingRef.current = false;
-    }
+    } finally { isPlacingRef.current = false; }
   };
-
-  // ── Peter apply ────────────────────────────────────────────────────────────
-  const handlePeterApply = rec => {
-    const dec  = displayPrice > 100 ? 2 : 4;
-    const snap = v => parseFloat(Number(v).toFixed(dec));
-    peterApplyingRef.current = true;
-    if (rec.recommendedMarket) setMarket(rec.recommendedMarket);
-    if (rec.recommendedSymbol) setSymbol(rec.recommendedSymbol);
-    setTimeout(() => {
-      peterApplyingRef.current = false;
-      if (rec.entry)      setEntry(snap(rec.entry));
-      if (rec.takeProfit) setTakeProfit(snap(rec.takeProfit));
-      if (rec.stopLoss)   setStopLoss(snap(rec.stopLoss));
-      const found = LOT_SIZES.find(l => l.label === rec.lotSize);
-      if (found) setLotSize(found);
-      if (rec.volume) setVolume(Number(rec.volume));
-    }, 80);
-  };
-
-  const changeMarket = m => { if (peterApplyingRef.current) return; setMarket(m); setSymbol(SYMBOLS[m][0]); setMarketOpen(false); setSymbolOpen(false); resetOrder(); };
-  const changeSymbol = s => { if (peterApplyingRef.current) return; setSymbol(s); setSymbolOpen(false); resetOrder(); };
 
   const handleLineBtn = key => {
-    const dec  = displayPrice > 100 ? 2 : 4;
+    const dec = displayPrice > 100 ? 2 : 4;
     const snap = v => parseFloat(v.toFixed(dec));
-    if (key === "entry") setEntry(e      => e != null ? null : snap(displayPrice));
-    if (key === "tp")    setTakeProfit(t => t != null ? null : snap(displayPrice * 1.003));
-    if (key === "sl")    setStopLoss(s   => s != null ? null : snap(displayPrice * 0.997));
+    if (key === 'entry') setEntry(e => e != null ? null : snap(displayPrice));
+    if (key === 'tp') setTakeProfit(t => t != null ? null : snap(displayPrice * 1.003));
+    if (key === 'sl') setStopLoss(s => s != null ? null : snap(displayPrice * 0.997));
   };
 
-  const dropStyle = open => ({
-    width:"100%", background:C.panel, border:`1px solid ${open ? C.borderBright : C.border}`,
-    color:C.balVal, padding:"7px 10px", cursor:"pointer",
-    borderRadius: open ? "4px 4px 0 0" : "4px",
-    display:"flex", justifyContent:"space-between", alignItems:"center",
-    fontSize:"11px", fontFamily:"inherit", letterSpacing:"1px",
-  });
+  const changeMarket = m => { setMarket(m); setSymbol(SYMBOLS[m][0]); setMarketOpen(false); setSymbolOpen(false); resetOrder(); };
+  const changeSymbol = s => { setSymbol(s); setSymbolOpen(false); resetOrder(); };
 
-  const lineButtons = [
-    { key:"entry", label:"ENTRY",       color:C.entryCol, val:entry      },
-    { key:"tp",    label:"TAKE PROFIT", color:C.tpCol,    val:takeProfit },
-    { key:"sl",    label:"STOP LOSS",   color:C.slCol,    val:stopLoss   },
-  ];
+  const isCurrentTradeActive = openTrades.some(t => t.symbol === symbol && t.entry_price === entry && t.status === 'active');
+  const timeframes = ['1m', '5m', '15m', '1H', '1D', '1W'];
 
   return (
-    <div style={{minHeight:"100vh",background:C.bg,display:"flex",justifyContent:"center",fontFamily:"'Courier New',monospace"}}>
-      <div style={{width:"100%",maxWidth:"420px",minHeight:"100vh",background:`linear-gradient(180deg,${C.panel} 0%,${C.bg} 100%)`,position:"relative"}}>
+    <div className="min-h-screen bg-[#05050e] font-mono relative pb-16 overflow-hidden">
+      {/* Scan-line overlay */}
+      <div className="absolute inset-0 pointer-events-none z-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(167,139,250,0.008)_2px,rgba(167,139,250,0.008)_4px)]" />
 
-        <div style={{position:"absolute",inset:0,pointerEvents:"none",zIndex:0,
-          backgroundImage:"repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(167,139,250,0.008) 2px,rgba(167,139,250,0.008) 4px)"}}/>
+      <div className="relative z-10 max-w-[480px] mx-auto min-h-screen bg-gradient-to-b from-[#0d0820] to-[#05050e] border-x border-[#1e1e3a] flex flex-col">
 
-        {/* ── Toast ── */}
-        {toast && (
-          <div style={{position:"fixed",top:"50%",left:"50%",transform:"translate(-50%,-50%)",zIndex:150,width:"90%",maxWidth:280,pointerEvents:"none"}}>
-            <style>{`
-              @keyframes toastIn{from{opacity:0;transform:translate(-50%,-46%) scale(0.9)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
-              @keyframes shrink4{from{width:100%}to{width:0%}}
-            `}</style>
-            {toast.type==="NOFUNDS" ? (
-              <div style={{pointerEvents:"all",background:"linear-gradient(135deg,#180606,#2d0a0a)",border:"2px solid #ef4444",
-                borderRadius:14,padding:"20px 24px",textAlign:"center",animation:"toastIn 0.25s ease-out",boxShadow:"0 0 40px #ef444433"}}>
-                <div style={{fontSize:28,marginBottom:8}}>💸</div>
-                <div style={{color:"#f87171",fontSize:13,fontWeight:"bold",letterSpacing:2,marginBottom:6}}>NO FUNDS</div>
-                <div style={{color:"#c0a0a0",fontSize:10,marginBottom:14,lineHeight:1.6}}>Deposit to start trading simulations</div>
-                <button onClick={()=>{setToast(null);setShowWallet(true);}} style={{
-                  pointerEvents:"all",background:"linear-gradient(135deg,#06101a,#0a2040)",
-                  border:"1.5px solid #38bdf8",color:"#38bdf8",padding:"8px 20px",borderRadius:8,
-                  cursor:"pointer",fontFamily:"inherit",fontSize:10,fontWeight:"bold",letterSpacing:2}}>
-                  ⬡ OPEN WALLET
-                </button>
-              </div>
-            ) : toast.type==="PENDING" ? (
-              <div style={{background:"linear-gradient(135deg,#0a0820,#120a30)",border:"2px solid #a78bfa",
-                borderRadius:14,padding:"22px 28px",textAlign:"center",boxShadow:"0 0 50px #a78bfa33",animation:"toastIn 0.25s ease-out"}}>
-                <div style={{fontSize:22,marginBottom:6}}>⏳</div>
-                <div style={{color:"#a78bfa",fontSize:13,fontWeight:"bold",letterSpacing:2,marginBottom:4}}>ORDER PENDING</div>
-                <div style={{color:"#6060a0",fontSize:9,letterSpacing:2,marginBottom:10}}>WAITING FOR MARKET TO REACH ENTRY</div>
-                <div style={{width:"100%",height:1,background:"#a78bfa33",margin:"6px 0"}}/>
-                <div style={{fontSize:9,lineHeight:2.1,letterSpacing:1}}>
-                  <div style={{color:C.label}}>{toast.symbol} · {toast.lot} × Vol {toast.vol}</div>
-                  <div style={{color:toast.tradeType==="BUY"?C.buyText:C.sellText,fontWeight:"bold"}}>{toast.tradeType==="BUY"?"▲ BUY":"▼ SELL"}</div>
-                  <div style={{color:C.entryCol}}>ENTRY &nbsp;{toast.entryStr}</div>
-                  <div style={{color:C.tpCol}}>TP &nbsp;&nbsp;&nbsp;&nbsp;{toast.tpStr}</div>
-                  <div style={{color:C.slCol}}>SL &nbsp;&nbsp;&nbsp;&nbsp;{toast.slStr}</div>
-                </div>
-                <div style={{marginTop:12,overflow:"hidden",borderRadius:2,height:3,background:"#a78bfa22"}}>
-                  <div style={{height:"100%",background:"#a78bfa",animation:"shrink4 4s linear forwards"}}/>
-                </div>
-              </div>
-            ) : toast.type==="ENTRY_HIT" ? (
-              <div style={{background:"linear-gradient(135deg,#030f18,#061a30)",border:"2px solid #38bdf8",
-                borderRadius:14,padding:"22px 28px",textAlign:"center",boxShadow:"0 0 50px #38bdf844",animation:"toastIn 0.25s ease-out"}}>
-                <div style={{fontSize:26,marginBottom:6}}>🚀</div>
-                <div style={{color:"#38bdf8",fontSize:13,fontWeight:"bold",letterSpacing:2,marginBottom:4}}>TRADE ACTIVATED</div>
-                <div style={{color:"#4080a0",fontSize:9,letterSpacing:2,marginBottom:10}}>MARKET REACHED YOUR ENTRY</div>
-                <div style={{width:"100%",height:1,background:"#38bdf833",margin:"6px 0"}}/>
-                <div style={{fontSize:9,lineHeight:2.1,letterSpacing:1}}>
-                  <div style={{color:C.label}}>{toast.symbol} · {toast.lot} × Vol {toast.vol}</div>
-                  <div style={{color:toast.tradeType==="BUY"?C.buyText:C.sellText,fontWeight:"bold"}}>{toast.tradeType==="BUY"?"▲ BUY":"▼ SELL"} · NOW IN POSITION</div>
-                  <div style={{color:C.entryCol}}>ENTRY &nbsp;{toast.entryStr}</div>
-                  <div style={{color:C.tpCol}}>TP &nbsp;&nbsp;&nbsp;&nbsp;{toast.tpStr}</div>
-                  <div style={{color:C.slCol}}>SL &nbsp;&nbsp;&nbsp;&nbsp;{toast.slStr}</div>
-                </div>
-                <div style={{marginTop:12,overflow:"hidden",borderRadius:2,height:3,background:"#38bdf822"}}>
-                  <div style={{height:"100%",background:"#38bdf8",animation:"shrink4 4s linear forwards"}}/>
-                </div>
-              </div>
-            ) : (
-              <div style={{
-                background:toast.tradeType==="BUY"?"linear-gradient(135deg,#030f07,#051a0c)":"linear-gradient(135deg,#0f0303,#1a0505)",
-                border:`2px solid ${toast.tradeType==="BUY"?C.buyBorder:C.sellBorder}`,
-                borderRadius:14,padding:"22px 28px",textAlign:"center",
-                boxShadow:toast.tradeType==="BUY"?`0 0 50px ${C.buyBorder}44`:`0 0 50px ${C.sellBorder}44`,
-                animation:"toastIn 0.25s ease-out"}}>
-                <div style={{fontSize:22,fontWeight:"bold",letterSpacing:4,color:toast.tradeType==="BUY"?C.buyText:C.sellText,marginBottom:6}}>
-                  {toast.tradeType==="BUY"?"▲ BUY":"▼ SELL"}
-                </div>
-                <div style={{color:"#ffffff80",fontSize:9,letterSpacing:3,marginBottom:10}}>POSITION OPENED</div>
-                <div style={{width:"100%",height:1,background:toast.tradeType==="BUY"?C.buyBorder+"33":C.sellBorder+"33",margin:"6px 0"}}/>
-                <div style={{fontSize:9,lineHeight:2.1,letterSpacing:1}}>
-                  <div style={{color:C.label}}>{symbol} · {toast.lot} × Vol {toast.vol}</div>
-                  <div style={{color:C.entryCol}}>ENTRY &nbsp;{toast.entryStr}</div>
-                  <div style={{color:C.tpCol}}>TP &nbsp;&nbsp;&nbsp;&nbsp;{toast.tpStr}</div>
-                  <div style={{color:C.slCol}}>SL &nbsp;&nbsp;&nbsp;&nbsp;{toast.slStr}</div>
-                </div>
-                <div style={{marginTop:12,overflow:"hidden",borderRadius:2,height:3,background:toast.tradeType==="BUY"?C.buyBorder+"22":C.sellBorder+"22"}}>
-                  <div style={{height:"100%",background:toast.tradeType==="BUY"?C.buyBorder:C.sellBorder,animation:"shrink4 4s linear forwards"}}/>
-                </div>
+        {/* ── Top Bar ── */}
+        <div className="flex justify-between items-center px-4 pt-2 pb-1.5 shrink-0">
+          <div className="flex gap-4">
+            <div>
+              <div className="text-[8px] text-[#38bdf8] tracking-widest uppercase">Account Balance</div>
+              <div className="text-sm font-bold text-white tracking-wide">ZAR {balFmt(balance)}</div>
+            </div>
+            <div>
+              <div className="text-[8px] text-[#38bdf8] tracking-widest uppercase">Current Balance</div>
+              <div className="text-sm font-bold text-white tracking-wide">ZAR {balFmt(currentBalance)}</div>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowWallet(true)}
+            className="px-3 py-1.5 bg-[#0d0820] border border-[#38bdf8] rounded-lg text-[#38bdf8] text-[10px] font-bold tracking-widest hover:bg-[#38bdf810] transition-all"
+          >
+            ⬡ WALLET
+          </button>
+        </div>
+
+        {/* ── Market + Symbol Selectors ── */}
+        <div className="flex gap-2 px-4 pb-1.5 shrink-0">
+          {/* Market */}
+          <div className="flex-1 relative">
+            <button
+              onClick={() => { setMarketOpen(o => !o); setSymbolOpen(false); }}
+              className="w-full bg-[#0d0820] border border-[#1e1e3a] rounded-lg px-3 py-1.5 flex justify-between items-center text-xs text-white tracking-wide hover:border-[#38bdf840] transition-all"
+            >
+              {market}
+              <span className="text-[9px] opacity-50">▼</span>
+            </button>
+            {marketOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#0d0820] border border-[#2e2e5a] rounded-lg z-30 overflow-hidden">
+                {Object.keys(SYMBOLS).map(m => (
+                  <div
+                    key={m}
+                    onClick={() => changeMarket(m)}
+                    className="px-3 py-2 text-xs text-white/70 hover:bg-[#16162a] hover:text-white cursor-pointer border-b border-[#1e1e3a] last:border-0 transition-colors"
+                  >
+                    {m}
+                  </div>
+                ))}
               </div>
             )}
           </div>
-        )}
 
-        {/* ── Result Toast ── */}
-        {resultToast && (
-          <div style={{position:"fixed",top:0,left:"50%",transform:"translateX(-50%)",zIndex:160,width:"92%",maxWidth:360,padding:"12px 0 0",pointerEvents:"none"}}>
-            <style>{`
-              @keyframes slideDown{from{opacity:0;transform:translateX(-50%) translateY(-20px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-              @keyframes shrink5{from{width:100%}to{width:0%}}
-            `}</style>
-            <div style={{
-              background: resultToast.hit==="TP" ? "linear-gradient(135deg,#011a0a,#032e14)" : "linear-gradient(135deg,#1a0101,#2e0808)",
-              border:`2px solid ${resultToast.hit==="TP"?"#22c55e":"#ef4444"}`,
-              borderRadius:14,padding:"18px 22px",
-              boxShadow: resultToast.hit==="TP" ? "0 0 50px #22c55e44" : "0 0 50px #ef444444",
-              animation:"slideDown 0.3s ease-out",
-            }}>
-              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12}}>
-                <div style={{width:44,height:44,borderRadius:"50%",flexShrink:0,
-                  background: resultToast.hit==="TP" ? "#22c55e22" : "#ef444422",
-                  border:`2px solid ${resultToast.hit==="TP"?"#22c55e":"#ef4444"}`,
-                  display:"flex",alignItems:"center",justifyContent:"center",fontSize:20}}>
-                  {resultToast.hit==="TP" ? "🎯" : "🛑"}
-                </div>
-                <div>
-                  <div style={{color: resultToast.hit==="TP"?"#4ade80":"#f87171",fontSize:14,fontWeight:"bold",letterSpacing:2}}>
-                    {resultToast.hit==="TP" ? "TAKE PROFIT HIT" : "STOP LOSS HIT"}
+          {/* Symbol */}
+          <div className="flex-1 relative">
+            <button
+              onClick={() => { setSymbolOpen(o => !o); setMarketOpen(false); }}
+              className="w-full bg-[#0d0820] border border-[#1e1e3a] rounded-lg px-3 py-1.5 flex justify-between items-center text-xs text-[#facc15] font-bold tracking-wide hover:border-[#facc1540] transition-all"
+            >
+              {symbol}
+              <span className="text-[9px] text-white/30">▼</span>
+            </button>
+            {symbolOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-[#0d0820] border border-[#2e2e5a] rounded-lg z-30 overflow-hidden">
+                {SYMBOLS[market].map(s => (
+                  <div
+                    key={s}
+                    onClick={() => changeSymbol(s)}
+                    className="px-3 py-2 text-xs text-white/70 hover:bg-[#16162a] hover:text-white cursor-pointer border-b border-[#1e1e3a] last:border-0 transition-colors"
+                  >
+                    {s}
                   </div>
-                  <div style={{color:"#6060a0",fontSize:9,letterSpacing:1,marginTop:2}}>{resultToast.tradeType} · {resultToast.symbol}</div>
-                </div>
+                ))}
               </div>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
-                background: resultToast.hit==="TP" ? "#022010" : "#1a0505",borderRadius:8,padding:"10px 14px",marginBottom:10}}>
-                <div>
-                  <div style={{color:"#5050a0",fontSize:8,letterSpacing:2,marginBottom:3}}>{resultToast.hit==="TP" ? "PROFIT REALISED" : "LOSS REALISED"}</div>
-                  <div style={{color: resultToast.pnl>=0?"#4ade80":"#f87171",fontSize:22,fontWeight:"bold",letterSpacing:1}}>
-                    {resultToast.pnl>=0?"+":""}{Math.abs(resultToast.pnl).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})} ZAR
-                  </div>
-                </div>
-                <div style={{textAlign:"right"}}>
-                  <div style={{color:"#5050a0",fontSize:8,letterSpacing:1,marginBottom:3}}>PIPS</div>
-                  <div style={{color: resultToast.pnl>=0?"#4ade80":"#f87171",fontSize:18,fontWeight:"bold"}}>
-                    {resultToast.pnl>=0?"+":"-"}{resultToast.pips}
-                  </div>
-                </div>
-              </div>
-              <div style={{overflow:"hidden",borderRadius:2,height:3,background: resultToast.hit==="TP"?"#22c55e22":"#ef444422"}}>
-                <div style={{height:"100%",background:resultToast.hit==="TP"?"#22c55e":"#ef4444",animation:"shrink5 5s linear forwards"}}/>
-              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ── Price + Change ── */}
+        <div className="flex items-baseline gap-2 px-4 pb-1 shrink-0">
+          <span className="text-xl font-bold text-[#facc15] tracking-wider">
+            {displayPrice > 0
+              ? displayPrice.toLocaleString('en-ZA', { minimumFractionDigits: 4 })
+              : '—'}
+          </span>
+          <span className={`text-[10px] font-bold ${Number(priceChange) >= 0 ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
+            {Number(priceChange) >= 0 ? '+' : ''}{priceChange}%
+          </span>
+        </div>
+
+        {/* ── Timeframe Selector ── */}
+        <div className="flex gap-1 px-4 pb-1.5 shrink-0">
+          {timeframes.map(tf => (
+            <button
+              key={tf}
+              onClick={() => setTimeframe(tf)}
+              className={`px-2 py-0.5 rounded text-[9px] font-bold tracking-wide transition-all ${
+                timeframe === tf
+                  ? 'bg-[#38bdf8] text-[#05050e]'
+                  : 'bg-[#0a0a1e] border border-[#2e2e58] text-[#5050a0] hover:text-[#8888c0] hover:border-[#38bdf840]'
+              }`}
+            >
+              {tf}
+            </button>
+          ))}
+        </div>
+
+        {/* ── Chart Area + Drawing Tools ── */}
+        <div className="px-3 pb-1.5 flex-1 flex flex-col min-h-0">
+          <div className="bg-[#0a0a1e] border border-[#1e1e3a] rounded-xl overflow-hidden flex flex-1 min-h-0">
+
+            {/* Left Drawing Tools */}
+            <DrawingToolbar activeTool={activeTool} onToolSelect={setActiveTool} />
+
+            {/* Chart — fills remaining space, CandleChart measures itself via ResizeObserver */}
+            <div className="flex-1 min-w-0 min-h-0">
+              <CandleChart
+                livePrice={livePrice}
+                entry={entry}
+                takeProfit={takeProfit}
+                stopLoss={stopLoss}
+                onEntryChange={setEntry}
+                onTPChange={setTakeProfit}
+                onSLChange={setStopLoss}
+                isTradeActive={isCurrentTradeActive}
+                showControls={showControls}
+              />
             </div>
           </div>
-        )}
+        </div>
 
-        {showWallet && (
-          <WalletModal balance={balance} openTrades={openTrades}
-            onDeposit={async n => { await walletAPI.deposit(n); await fetchWallet(); }}
-            onWithdraw={async n => { await walletAPI.withdraw(n); await fetchWallet(); }}
-            onCloseAll={handleCloseTrade}
-            onClose={() => setShowWallet(false)}/>
-        )}
-        {showPeter && (
-          <PeterModal onClose={() => setShowPeter(false)} onApply={handlePeterApply}
-            livePrice={displayPrice} symbol={symbol} market={market}
-            usageCount={peterUsage} onUseRequest={() => setPeterUsage(n => n + 1)}
-            isSubscribed={isSubscribed}
-            onSubscribed={async () => { await fetchSubscription(); await fetchWallet(); }}/>
-        )}
-
-        <div style={{position:"relative",zIndex:1}}>
-
-          {/* ① Balance row */}
-          <div style={{padding:"12px 16px 10px",borderBottom:`1px solid ${C.border}`,display:"flex",alignItems:"center",gap:10}}>
-            <div style={{flex:1}}>
-              <div style={{marginBottom:8}}>
-              </div>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
-                <span style={{color:C.balLabel,fontSize:10,letterSpacing:1}}>ACCOUNT BALANCE</span>
-                <span style={{color: balance<0?"#f87171":balance===0?"#4a4a78":C.balVal, fontSize:13,fontWeight:"bold",letterSpacing:1}}>
-                  {balance===0 ? "ZAR 0,00" : balance<0
-                    ? `− ZAR ${Math.abs(balance).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}`
-                    : balFmt(balance)}
-                </span>
-              </div>
-              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                <span style={{color:C.balLabel,fontSize:10,letterSpacing:1}}>CURRENT BALANCE</span>
-                <span style={{color: currentBalance<0?"#f87171":currentBalance>balance?"#4ade80":C.balVal, fontSize:13,fontWeight:"bold",letterSpacing:1}}>
-                  {currentBalance<0
-                    ? `− ZAR ${Math.abs(currentBalance).toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:2})}`
-                    : balFmt(currentBalance)}
-                </span>
-              </div>
-              {balance<0 && (
-                <div style={{marginTop:6,padding:"5px 8px",background:"#2a080833",border:"1px solid #ef444444",borderRadius:6}}>
-                  <span style={{color:"#f87171",fontSize:8,letterSpacing:1}}>⚠ ACCOUNT IN DEFICIT — DEPOSIT FUNDS BEFORE TRADING</span>
-                </div>
-              )}
-            </div>
-            <button onClick={() => setShowPeter(true)} style={{
-              width:42,height:42,borderRadius:"50%",flexShrink:0,
-              background:"linear-gradient(135deg,#3b0764,#6d28d9)",
-              border:"2px solid #a78bfa",color:"#ddd6fe",
-              fontSize:11,fontWeight:"bold",letterSpacing:1,cursor:"pointer",fontFamily:"inherit",
-              boxShadow:"0 0 18px #7c3aed55",display:"flex",alignItems:"center",justifyContent:"center",
-            }}>AI</button>
-          </div>
-
-          {/* Positions strip */}
-          {(openTrades.length > 0 || pendingOrders.length > 0) && (
-            <div style={{background:"#06060f",borderBottom:`1px solid ${C.border}`,padding:"6px 16px",display:"flex",gap:8,overflowX:"auto"}}>
+        {/* ── Open Positions Strip ── */}
+        {(openTrades.length > 0 || pendingOrders.length > 0) && (
+          <div className="px-4 pb-2 shrink-0">
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
               {pendingOrders.map(o => (
-                <div key={`pending-${o.id}`} onClick={() => setShowWallet(true)} style={{
-                  flexShrink:0,display:"flex",alignItems:"center",gap:6,
-                  background:"#0d0820",border:"1px solid #a78bfa44",borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>
-                  <span style={{color:"#a78bfa",fontSize:9}}>⏳</span>
-                  <span style={{color:o.type==="BUY"?"#4ade80":"#f87171",fontSize:9,fontWeight:"bold"}}>{o.type==="BUY"?"▲":"▼"}</span>
-                  <span style={{color:"#7070a8",fontSize:9}}>{o.symbol}</span>
-                  <span style={{color:"#6060a0",fontSize:8,letterSpacing:1}}>PENDING</span>
+                <div
+                  key={`pending-${o.id}`}
+                  className="flex items-center gap-1.5 bg-[#0d0820] border border-[#a78bfa44] rounded-lg px-2.5 py-1.5 shrink-0 cursor-pointer hover:border-[#a78bfa80] transition-colors"
+                >
+                  <span className="text-[#a78bfa] text-[9px]">⏳</span>
+                  <span className={`text-[9px] font-bold ${o.direction === 'BUY' ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
+                    {o.direction === 'BUY' ? '▲' : '▼'}
+                  </span>
+                  <span className="text-[#7070a8] text-[9px] tracking-wide">{o.symbol}</span>
                 </div>
               ))}
               {openTrades.map(t => (
-                <div key={`open-${t.id}`} onClick={() => setShowWallet(true)} style={{
-                  flexShrink:0,display:"flex",alignItems:"center",gap:6,
-                  background:"#0a0a1e",border:`1px solid ${t.pnl>=0?"#22c55e33":"#ef444433"}`,borderRadius:6,padding:"5px 10px",cursor:"pointer"}}>
-                  <span style={{color:t.type==="BUY"?"#4ade80":"#f87171",fontSize:9,fontWeight:"bold"}}>{t.type==="BUY"?"▲":"▼"}</span>
-                  <span style={{color:"#a78bfa",fontSize:9}}>{t.symbol}</span>
-                  <span style={{color:t.pnl>=0?"#4ade80":"#f87171",fontSize:9,fontWeight:"bold"}}>{t.pnl>=0?"+":""}{t.pnl.toFixed(2)}</span>
+                <div
+                  key={`open-${t.id}`}
+                  onClick={() => handleCloseTrade(t.id)}
+                  className="flex items-center gap-1.5 bg-[#0a0a1e] border border-[#22c55e33] rounded-lg px-2.5 py-1.5 shrink-0 cursor-pointer hover:border-[#22c55e66] transition-colors"
+                >
+                  <span className={`text-[9px] font-bold ${t.direction === 'BUY' ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
+                    {t.direction === 'BUY' ? '▲' : '▼'}
+                  </span>
+                  <span className="text-[#a78bfa] text-[9px] tracking-wide">{t.symbol}</span>
+                  <span className={`text-[9px] font-bold ${t.pnl >= 0 ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
+                    {t.pnl >= 0 ? '+' : ''}{t.pnl?.toFixed(2)}
+                  </span>
                 </div>
               ))}
             </div>
-          )}
-
-          {/* ② Market + Symbol */}
-          <div style={{padding:"10px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",gap:12}}>
-            {[
-              { label:"MARKET", open:marketOpen, toggle:()=>{setMarketOpen(o=>!o);setSymbolOpen(false);}, val:market, opts:Object.keys(SYMBOLS), onSelect:changeMarket },
-              { label:"SYMBOL", open:symbolOpen, toggle:()=>{setSymbolOpen(o=>!o);setMarketOpen(false);}, val:symbol, opts:SYMBOLS[market], onSelect:changeSymbol },
-            ].map(dd => (
-              <div key={dd.label} style={{flex:1,position:"relative"}}>
-                <div style={{color:C.labelDim,fontSize:8,letterSpacing:2,marginBottom:3}}>{dd.label}</div>
-                <button onClick={dd.toggle} style={dropStyle(dd.open)}>
-                  {dd.val} <span style={{fontSize:7,opacity:0.6}}>▼</span>
-                </button>
-                {dd.open && (
-                  <div style={{position:"absolute",top:"100%",left:0,right:0,zIndex:30,background:C.panel,border:`1px solid ${C.borderBright}`,borderTop:"none",borderRadius:"0 0 4px 4px"}}>
-                    {dd.opts.map(opt => (
-                      <div key={opt} onClick={() => dd.onSelect(opt)}
-                        style={{padding:"7px 10px",color:opt===dd.val?C.symbolCol:C.label,cursor:"pointer",fontSize:10,letterSpacing:1,borderBottom:`1px solid ${C.border}`}}
-                        onMouseEnter={e => e.currentTarget.style.background="#16162a"}
-                        onMouseLeave={e => e.currentTarget.style.background="transparent"}
-                      >{opt}</div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
           </div>
+        )}
 
-          {/* ③ Chart */}
-          <div style={{padding:"10px 16px",borderBottom:`1px solid ${C.border}`}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <span style={{color:C.symbolCol,fontSize:13,fontWeight:"bold",letterSpacing:2}}>{symbol}</span>
-              <span style={{color:C.priceCol,fontSize:16,fontWeight:"bold",fontVariantNumeric:"tabular-nums"}}>
-                {displayPrice > 0
-                  ? displayPrice.toLocaleString("en-ZA",{minimumFractionDigits:2,maximumFractionDigits:displayPrice>100?2:4})
-                  : "—"}
-              </span>
-            </div>
-            <CandleChart
-              symbol={symbol} livePrice={livePrice}
-              entry={entry} takeProfit={takeProfit} stopLoss={stopLoss}
-              onEntry={setEntry} onTP={setTakeProfit} onSL={setStopLoss}
-              openTrades={openTrades} pendingOrders={pendingOrders}
-              onPriceUpdate={setChartPrice}
-            />
-          </div>
-
-          {/* ④ Lot Size */}
-          <div style={{padding:"8px 16px",borderBottom:`1px solid ${C.border}`}}>
-            <div style={{color:C.labelDim,fontSize:8,letterSpacing:2,marginBottom:5}}>LOT SIZE</div>
-            <div style={{display:"flex",gap:6}}>
-              {LOT_SIZES.map(ls => {
-                const sel = lotSize?.label === ls.label;
-                return (
-                  <button key={ls.label} onClick={() => setLotSize(ls)} style={{
-                    flex:1,padding:"5px 3px",
-                    background: sel?"#1a0a3a":"#0a0a18",
-                    border:`1.5px solid ${sel?C.lotSelBorder:C.border}`,
-                    borderRadius:5,cursor:"pointer",color:sel?C.lotSelText:C.label,
-                    fontFamily:"inherit",transition:"all 0.15s",
-                  }}>
-                    <div style={{fontSize:9,fontWeight:"bold",letterSpacing:1}}>{ls.label}</div>
-                    <div style={{fontSize:8,marginTop:1,opacity:0.65}}>{ls.sublabel}</div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* ⑤ Volume */}
-          <div style={{padding:"8px 16px",borderBottom:`1px solid ${C.border}`,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-            <div style={{color:C.labelDim,fontSize:8,letterSpacing:2}}>VOLUME</div>
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <button onClick={() => setVolume(v => Math.max(1,v-1))} style={{background:"#0a0a18",border:`1px solid ${C.border}`,color:C.volText,width:26,height:26,borderRadius:4,cursor:"pointer",fontSize:15,fontFamily:"inherit"}}>−</button>
-              <div style={{background:"#0a0a18",border:`1px solid ${C.volBorder}`,color:C.volText,padding:"3px 16px",borderRadius:4,fontSize:13,fontWeight:"bold",minWidth:32,textAlign:"center"}}>{volume}</div>
-              <button onClick={() => setVolume(v => Math.min(100,v+1))} style={{background:"#0a0a18",border:`1px solid ${C.border}`,color:C.volText,width:26,height:26,borderRadius:4,cursor:"pointer",fontSize:15,fontFamily:"inherit"}}>+</button>
-            </div>
-          </div>
-
-          {/* ⑥ Set Levels */}
-          <div style={{padding:"8px 16px",borderBottom:`1px solid ${C.border}`,background:C.setLvlBg}}>
-            <div style={{color:C.labelDim,fontSize:8,letterSpacing:2,marginBottom:6}}>SET LEVELS</div>
-            <div style={{display:"flex",gap:8}}>
-              {lineButtons.map(b => (
-                <button key={b.key} onClick={() => handleLineBtn(b.key)} style={{
-                  flex:1,padding:"8px 4px",
-                  background:   b.val!=null ? b.color+"18" : "#0d0d1f",
-                  border:      `1.5px solid ${b.val!=null ? b.color : b.color+"30"}`,
-                  color:        b.val!=null ? b.color : b.color+"50",
-                  borderRadius:5,cursor:"pointer",fontFamily:"inherit",
-                  fontSize:8,letterSpacing:"0.5px",transition:"all 0.15s",
-                  fontWeight:b.val!=null?"bold":"normal",
-                }}>
-                  <div style={{fontSize:11,marginBottom:2}}>{b.val!=null?"✕":"+"}</div>
-                  {b.label}
-                </button>
-              ))}
-            </div>
-            <div style={{color:C.labelDim,fontSize:7,textAlign:"center",marginTop:5,letterSpacing:1}}>
-              TAP TO PLACE IN CHART CENTRE · DRAG LINE TO ADJUST
-            </div>
-          </div>
-
-          {/* ⑦ Values */}
-          <div style={{padding:"10px 16px",borderBottom:`1px solid ${C.border}`}}>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:4}}>
-              <div>
-                <div style={{color:C.labelDim,fontSize:"7.5px",letterSpacing:1,marginBottom:3}}>ENTRY</div>
-                <div style={{color:entry!=null?C.entryCol:"#1e1e40",fontSize:12,fontWeight:"bold"}}>{priceFmt(entry)}</div>
-              </div>
-              <div>
-                <div style={{color:C.labelDim,fontSize:"7.5px",letterSpacing:1,marginBottom:3}}>TAKE PROFIT</div>
-                <div style={{color:takeProfit!=null?C.tpCol:"#1a2e1a",fontSize:12,fontWeight:"bold"}}>{priceFmt(takeProfit)}</div>
-                {profitCalc
-                  ? <><div style={{color:C.tpCol+"88",fontSize:8,marginTop:2}}>+{profitCalc.pips} pips</div>
-                      <div style={{color:C.tpCol,fontSize:11,fontWeight:"bold",marginTop:1}}>{zarFmt(profitCalc.zar)}</div></>
-                  : <div style={{color:C.labelDim,fontSize:10,marginTop:2}}>ZAR 0,00</div>}
-              </div>
-              <div>
-                <div style={{color:C.labelDim,fontSize:"7.5px",letterSpacing:1,marginBottom:3}}>STOP LOSS</div>
-                <div style={{color:stopLoss!=null?C.slCol:"#2e1a1a",fontSize:12,fontWeight:"bold"}}>{priceFmt(stopLoss)}</div>
-                {lossCalc
-                  ? <><div style={{color:C.slCol+"88",fontSize:8,marginTop:2}}>-{lossCalc.pips} pips</div>
-                      <div style={{color:C.slCol,fontSize:11,fontWeight:"bold",marginTop:1}}>-{zarFmt(lossCalc.zar)}</div></>
-                  : <div style={{color:C.labelDim,fontSize:10,marginTop:2}}>ZAR 0,00</div>}
-              </div>
-            </div>
-          </div>
-
-          {/* ⑧ BUY / SELL */}
-          <div style={{padding:"12px 16px",display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
-            <button onClick={() => handleTrade("BUY")} disabled={!canBuy} style={{
-              background:canBuy?C.buyBg:"#0a0a0a",border:`2px solid ${canBuy?C.buyBorder:"#1a2a1a"}`,
-              color:canBuy?C.buyText:"#2a3a2a",padding:13,borderRadius:6,
-              cursor:canBuy?"pointer":"not-allowed",fontFamily:"inherit",fontSize:15,fontWeight:"bold",letterSpacing:3,
-              boxShadow:canBuy?`0 0 18px ${C.buyBorder}25`:"none",opacity:canBuy?1:0.3,transition:"all 0.2s",
-            }}>▲ BUY</button>
-            <button onClick={() => handleTrade("SELL")} disabled={!canSell} style={{
-              background:canSell?C.sellBg:"#0a0a0a",border:`2px solid ${canSell?C.sellBorder:"#2a1a1a"}`,
-              color:canSell?C.sellText:"#3a2a2a",padding:13,borderRadius:6,
-              cursor:canSell?"pointer":"not-allowed",fontFamily:"inherit",fontSize:15,fontWeight:"bold",letterSpacing:3,
-              boxShadow:canSell?`0 0 18px ${C.sellBorder}25`:"none",opacity:canSell?1:0.3,transition:"all 0.2s",
-            }}>▼ SELL</button>
-          </div>
-
-          {tradeDirection && (
-            <div style={{padding:"2px 16px 8px",textAlign:"center"}}>
-              <span style={{fontSize:8,letterSpacing:1,color:tradeDirection==="BUY"?C.buyText+"88":C.sellText+"88"}}>
-                {tradeDirection==="BUY"?"▲ TP ABOVE ENTRY — BUY DIRECTION":"▼ TP BELOW ENTRY — SELL DIRECTION"}
-              </span>
-            </div>
-          )}
-
-          {/* ⑨ Wallet Bar */}
-          <div style={{borderTop:`1px solid ${C.border}`,padding:"14px 16px"}}>
-            <button onClick={() => setShowWallet(true)} style={{
-              width:"100%",padding:"14px 20px",borderRadius:10,cursor:"pointer",
-              background: balance<0 ? "linear-gradient(135deg,#1a0606,#2d0a0a)" : balance>0 ? "linear-gradient(135deg,#061426,#082040)" : "linear-gradient(135deg,#140e04,#201a04)",
-              border:`2px solid ${balance<0?"#ef4444":balance>0?"#38bdf8":"#facc15"}`,
-              boxShadow:`0 0 22px ${balance<0?"#ef444422":balance>0?"#38bdf822":"#facc1522"}`,
-              fontFamily:"inherit",display:"flex",alignItems:"center",justifyContent:"space-between",transition:"all 0.2s",
-            }}>
-              <div style={{display:"flex",alignItems:"center",gap:12}}>
-                <span style={{fontSize:20,color:balance<0?"#ef4444":balance>0?"#38bdf8":"#facc15"}}>⬡</span>
-                <div style={{textAlign:"left"}}>
-                  <div style={{color:balance<0?"#ef4444":balance>0?"#38bdf8":"#facc15",fontSize:11,fontWeight:"bold",letterSpacing:2}}>
-                    {balance<0 ? "⚠ ACCOUNT IN DEFICIT" : balance>0 ? "WALLET" : "⬡ DEPOSIT TO TRADE"}
-                  </div>
-                  <div style={{color:balance<0?"#c08080":balance>0?"#5090b8":"#8a7040",fontSize:9,marginTop:2,letterSpacing:1}}>
-                    {balance<0 ? "Deposit funds to restore your account" : balance>0 ? `${openTrades.length} open position${openTrades.length!==1?"s":""}` : "Tap to add simulation funds"}
-                  </div>
-                </div>
-              </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{color:balance<0?"#f87171":balance>0?"#c8e8ff":"#c8a840",fontSize:13,fontWeight:"bold",letterSpacing:1}}>
-                  {balFmt(currentBalance)}
-                </div>
-                {totalPnl!==0 && (
-                  <div style={{color:totalPnl>=0?"#4ade80":"#f87171",fontSize:9,marginTop:2}}>
-                    {totalPnl>=0?"▲ +":"▼ "}{Math.abs(totalPnl).toFixed(2)} P&L
-                  </div>
-                )}
-              </div>
-            </button>
-          </div>
-
+        {/* ── Show / Hide Controls Toggle ── */}
+        <div className="flex justify-center py-1.5 shrink-0">
+          <button
+            onClick={() => setShowControls(c => !c)}
+            className="flex items-center gap-1.5 px-4 py-1 bg-[#1a1a30] border border-[#3a3a60] rounded-full text-[#38bdf8] text-[9px] font-bold tracking-widest hover:bg-[#2a2a40] hover:border-[#38bdf860] transition-all"
+          >
+            <span className="text-[10px]">⚙</span>
+            {showControls ? 'HIDE CONTROLS' : 'SHOW CONTROL PANELS'}
+            <span
+              className="text-[8px] transition-transform duration-300 inline-block"
+              style={{ transform: showControls ? 'rotate(180deg)' : 'rotate(0deg)' }}
+            >▼</span>
+          </button>
         </div>
+
+        {/* ── Slide-Up Control Panel ── */}
+        <div
+          className={`
+            fixed bottom-16 left-0 right-0 max-w-[480px] mx-auto z-20
+            bg-gradient-to-t from-[#0a0820] to-[#0d0d2a]
+            border-t border-[#2e2e58] rounded-t-2xl
+            transition-transform duration-300 ease-in-out
+            ${showControls ? 'translate-y-0' : 'translate-y-full'}
+          `}
+        >
+          {/* Drag handle */}
+          <div
+            onClick={() => setShowControls(false)}
+            className="flex justify-center items-center pt-2 pb-1 cursor-pointer"
+          >
+            <div className="w-12 h-1 bg-[#3a3a6a] rounded-full" />
+          </div>
+
+          <div className="px-3 pb-3 pt-1 space-y-2.5">
+
+            {/* Lot Size */}
+            <div>
+              <div className="text-[7px] text-[#5050a0] tracking-widest uppercase mb-1.5">Lot Size</div>
+              <div className="flex gap-1.5">
+                {LOT_SIZES.map(ls => (
+                  <button
+                    key={ls.label}
+                    onClick={() => setLotSize(ls)}
+                    className={`flex-1 py-1.5 rounded-lg border transition-all ${
+                      lotSize?.label === ls.label
+                        ? 'bg-[#1a0a3a] border-[#a78bfa] text-[#ddd6fe]'
+                        : 'bg-[#0a0a18] border-[#1e1e3a] text-[#5050a0] hover:border-[#38bdf840] hover:text-[#8888c0]'
+                    }`}
+                  >
+                    <div className="text-[8px] font-bold uppercase tracking-wider">{ls.label}</div>
+                    <div className="text-[7px] opacity-50">{ls.sublabel}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Volume + Set Levels — side by side */}
+            <div className="flex gap-2">
+              {/* Volume */}
+              <div className="flex-1">
+                <div className="text-[7px] text-[#5050a0] tracking-widest uppercase mb-1.5">Volume</div>
+                <div className="flex items-center justify-between bg-[#0a0a18] border border-[#1e1e3a] rounded-lg px-2 py-1.5">
+                  <button
+                    onClick={() => setVolume(v => Math.max(1, v - 1))}
+                    className="w-6 h-6 bg-[#0d0d20] border border-[#1e1e3a] rounded text-white text-sm hover:border-[#38bdf840] transition-all flex items-center justify-center"
+                  >−</button>
+                  <span className="text-sm font-bold text-white w-5 text-center">{volume}</span>
+                  <button
+                    onClick={() => setVolume(v => v + 1)}
+                    className="w-6 h-6 bg-[#0d0d20] border border-[#1e1e3a] rounded text-white text-sm hover:border-[#38bdf840] transition-all flex items-center justify-center"
+                  >+</button>
+                </div>
+              </div>
+
+              {/* Level values display */}
+              <div className="flex-1">
+                <div className="text-[7px] text-[#5050a0] uppercase tracking-wider mb-1.5">Levels</div>
+                <div className="flex gap-1.5">
+                  <div className="flex-1">
+                    <div className="text-[6px] text-[#5050a0]">ENTRY</div>
+                    <div className={`text-[9px] font-bold ${entry ? 'text-[#38bdf8]' : 'text-[#1e1e40]'}`}>{priceFmt(entry)}</div>
+                    {profitCalc && <div className="text-[6px] text-green-400/70">+{profitCalc.pips}p</div>}
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-[6px] text-[#5050a0]">TP</div>
+                    <div className={`text-[9px] font-bold ${takeProfit ? 'text-[#4ade80]' : 'text-[#1a2e1a]'}`}>{priceFmt(takeProfit)}</div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-[6px] text-[#5050a0]">SL</div>
+                    <div className={`text-[9px] font-bold ${stopLoss ? 'text-[#f87171]' : 'text-[#2e1a1a]'}`}>{priceFmt(stopLoss)}</div>
+                    {lossCalc && <div className="text-[6px] text-red-400/70">-{lossCalc.pips}p</div>}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Set Levels */}
+            <div>
+              <div className="text-[7px] text-[#5050a0] tracking-widest uppercase mb-1.5">Set Levels</div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {[
+                  { key: 'entry', label: 'ENTRY',  color: '#38bdf8', activeClass: 'border-[#38bdf8] bg-[#38bdf810] text-[#38bdf8]' },
+                  { key: 'tp',    label: 'TP',      color: '#4ade80', activeClass: 'border-[#4ade80] bg-[#4ade8010] text-[#4ade80]' },
+                  { key: 'sl',    label: 'SL',      color: '#f87171', activeClass: 'border-[#f87171] bg-[#f8717110] text-[#f87171]' },
+                ].map(btn => {
+                  const isSet = btn.key === 'entry' ? !!entry : btn.key === 'tp' ? !!takeProfit : !!stopLoss;
+                  return (
+                    <button
+                      key={btn.key}
+                      onClick={() => handleLineBtn(btn.key)}
+                      className={`py-1.5 rounded-lg border-2 text-center transition-all ${
+                        isSet ? btn.activeClass : 'bg-[#0d0d1f] border-[#2e2e58] text-white/30 hover:border-[#3e3e68]'
+                      }`}
+                    >
+                      <div className="text-sm font-bold">{isSet ? '✕' : '+'}</div>
+                      <div className="text-[7px] uppercase tracking-wider">{btn.label}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Buy / Sell */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleTrade('BUY')}
+                disabled={!canBuy}
+                className={`flex-1 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${
+                  canBuy
+                    ? 'bg-[#4ade8010] border-2 border-[#4ade80] text-[#4ade80] hover:bg-[#4ade8020] active:scale-[0.98]'
+                    : 'bg-[#0a0a0a] border-2 border-[#1a2e1a] text-[#2a3a2a] opacity-30 cursor-not-allowed'
+                }`}
+              >
+                ▲ BUY
+              </button>
+              <button
+                onClick={() => handleTrade('SELL')}
+                disabled={!canSell}
+                className={`flex-1 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${
+                  canSell
+                    ? 'bg-[#f8717110] border-2 border-[#f87171] text-[#f87171] hover:bg-[#f8717120] active:scale-[0.98]'
+                    : 'bg-[#0a0a0a] border-2 border-[#2a1a1a] text-[#3a2a2a] opacity-30 cursor-not-allowed'
+                }`}
+              >
+                SELL ▼
+              </button>
+            </div>
+
+          </div>
+        </div>
+
       </div>
 
+      {/* ── Bottom Nav ── */}
       <BottomNav active="trade" />
+
+      {/* ── Wallet Modal ── */}
+      {showWallet && (
+        <WalletModal
+          balance={balance}
+          openTrades={openTrades}
+          onDeposit={async n => { await walletAPI.deposit(n); await fetchWallet(); }}
+          onWithdraw={async n => { await walletAPI.withdraw(n); await fetchWallet(); }}
+          onCloseAll={handleCloseTrade}
+          onClose={() => setShowWallet(false)}
+        />
+      )}
+
+      {/* ── Trade Activated Modal ── */}
+      {showActivationModal && activationDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-gradient-to-b from-[#0d0820] to-[#0a0820] border border-[#38bdf8] rounded-2xl max-w-sm w-full p-6">
+            <div className="text-[#38bdf8] text-base font-bold mb-4 text-center tracking-widest uppercase">Trade Activated</div>
+            <div className="space-y-2 text-xs">
+              {[
+                { label: 'Symbol',      val: activationDetails.symbol,    cls: 'text-white' },
+                { label: 'Direction',   val: activationDetails.direction === 'BUY' ? '▲ BUY' : '▼ SELL', cls: activationDetails.direction === 'BUY' ? 'text-[#4ade80]' : 'text-[#f87171]' },
+                { label: 'Lot',         val: `${activationDetails.lot} × ${activationDetails.volume}`, cls: 'text-white' },
+                { label: 'Entry Price', val: activationDetails.entryPrice, cls: 'text-[#38bdf8]' },
+                { label: 'TP',          val: activationDetails.tp || '–', cls: 'text-[#4ade80]' },
+                { label: 'SL',          val: activationDetails.sl || '–', cls: 'text-[#f87171]' },
+              ].map(row => (
+                <div key={row.label} className="flex justify-between">
+                  <span className="text-white/50 tracking-wider">{row.label}</span>
+                  <span className={`font-bold ${row.cls}`}>{row.val}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowActivationModal(false)}
+              className="mt-5 w-full py-2.5 bg-white/5 border border-[#2e2e58] rounded-xl text-white/70 text-xs tracking-widest hover:bg-white/10 transition-all"
+            >
+              CLOSE
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Result Modal ── */}
+      {showResultModal && resultDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className={`bg-gradient-to-b from-[#0d0820] to-[#0a0820] border-2 rounded-2xl max-w-sm w-full p-6 ${resultDetails.hit === 'TP' ? 'border-[#4ade80]' : 'border-[#f87171]'}`}>
+            <div className={`text-base font-bold mb-4 text-center tracking-widest uppercase ${resultDetails.hit === 'TP' ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
+              {resultDetails.hit === 'TP' ? 'Take Profit Hit' : 'Stop Loss Hit'}
+            </div>
+            <div className="space-y-2 text-xs">
+              {[
+                { label: 'Symbol',      val: resultDetails.symbol,    cls: 'text-white' },
+                { label: 'Direction',   val: resultDetails.direction === 'BUY' ? '▲ BUY' : '▼ SELL', cls: resultDetails.direction === 'BUY' ? 'text-[#4ade80]' : 'text-[#f87171]' },
+                { label: 'Entry',       val: resultDetails.entryPrice, cls: 'text-[#38bdf8]' },
+                { label: 'Close',       val: resultDetails.closePrice, cls: 'text-white' },
+                { label: 'Pips',        val: resultDetails.pips,       cls: resultDetails.pnl >= 0 ? 'text-[#4ade80]' : 'text-[#f87171]' },
+                { label: 'P&L',         val: `${resultDetails.pnl >= 0 ? '+' : ''}${resultDetails.pnl.toFixed(2)} ZAR`, cls: resultDetails.pnl >= 0 ? 'text-[#4ade80]' : 'text-[#f87171]' },
+              ].map(row => (
+                <div key={row.label} className="flex justify-between">
+                  <span className="text-white/50 tracking-wider">{row.label}</span>
+                  <span className={`font-bold ${row.cls}`}>{row.val}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowResultModal(false)}
+              className="mt-5 w-full py-2.5 bg-white/5 border border-[#2e2e58] rounded-xl text-white/70 text-xs tracking-widest hover:bg-white/10 transition-all"
+            >
+              CLOSE
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Toast Notifications ── */}
+      {toast?.type === 'NOFUNDS' && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#f87171]/90 text-white px-4 py-2.5 rounded-xl text-xs font-bold tracking-wide z-50 border border-[#f87171]">
+          Insufficient funds — please deposit first.
+        </div>
+      )}
+      {toast?.type === 'PENDING' && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-[#a78bfa]/90 text-white px-4 py-2.5 rounded-xl text-xs font-bold tracking-wide z-50 border border-[#a78bfa]">
+          Order placed — waiting for entry...
+        </div>
+      )}
     </div>
   );
 }
