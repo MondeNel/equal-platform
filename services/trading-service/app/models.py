@@ -64,4 +64,19 @@ class PlayerStats(Base):
     total_wins = Column(Integer, default=0)
     total_losses = Column(Integer, default=0)
     total_bets = Column(Integer, default=0)
+    milestones_offered = Column(String, default="")  # comma-separated milestones already offered
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class PendingBonus(Base):
+    __tablename__ = "pending_bonuses"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    trade_id = Column(UUID(as_uuid=True), nullable=False)
+    user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    base_pnl = Column(Numeric(18, 4), nullable=False)
+    multiplier = Column(Numeric(5, 2), nullable=False)
+    milestone = Column(Integer, nullable=False)
+    close_price = Column(Numeric(18, 6), nullable=False)  # price at which trade was closed
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    status = Column(String, default="PENDING")  # PENDING, PROCESSED
