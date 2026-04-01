@@ -9,6 +9,7 @@ from app.routers.orders import router as orders_router
 from app.routers.trades import router as trades_router
 from app.routers.prices import router as prices_router
 from app.routers.prices import price_updater
+from app.routers.stats import router as stats_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -34,6 +35,7 @@ app.add_middleware(
 app.include_router(orders_router)
 app.include_router(trades_router)
 app.include_router(prices_router)
+app.include_router(stats_router)
 
 @app.get("/health")
 async def health():

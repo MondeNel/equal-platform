@@ -59,3 +59,10 @@ class TradeHistoryResponse(BaseModel):
     close_reason: str
     opened_at: datetime
     closed_at: datetime
+
+class PlayerStatsResponse(BaseModel):
+    win_streak: int
+    max_streak: int
+    total_wins: int
+    total_losses: int
+    total_bets: int
