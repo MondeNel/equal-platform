@@ -55,4 +55,8 @@ export const tradesAPI = {
   history: () => tradingApi.get('/api/trades/history'),
 };
 
+export const statsAPI = {
+  get: () => tradingApi.get('/api/stats'),
+};
+
 export default gatewayApi;
