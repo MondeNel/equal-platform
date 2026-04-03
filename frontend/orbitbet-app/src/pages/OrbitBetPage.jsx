@@ -5,10 +5,14 @@ import { useOrbitGame } from '../hooks/useOrbitGame';
 import StreakStack from '../components/StreakStack';
 import BottomNav from '../components/BottomNav';
 
+const WALLET_API_URL = "http://localhost:8002/api/wallet";
+
 export default function OrbitBetPage() {
-  const [balance] = useState(110.00);
+  const [balance, setBalance] = useState(0);
+  const [availableBalance, setAvailableBalance] = useState(0);
   const [stake, setStake] = useState(50);
   const [showResult, setShowResult] = useState(null);
+  const [insufficientFunds, setInsufficientFunds] = useState(false);
   
   const { 
     currentRound, 
@@ -21,15 +25,64 @@ export default function OrbitBetPage() {
     xpGained
   } = useOrbitGame();
 
+  // Get user ID from localStorage (same as trading dashboard)
+  const getUserId = () => {
+    const userJson = localStorage.getItem('equal_user');
+    if (userJson) {
+      try {
+        return JSON.parse(userJson).id;
+      } catch (e) {}
+    }
+    return '11111111-1111-1111-1111-111111111111';
+  };
+  const userId = getUserId();
+
+  // Fetch wallet balance
+  const fetchBalance = async () => {
+    try {
+      const response = await fetch(WALLET_API_URL, {
+        headers: { 'X-User-ID': userId }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setBalance(data.balance);
+        setAvailableBalance(data.available);
+      }
+    } catch (error) {
+      console.error("Failed to fetch wallet balance:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchBalance();
+    // Poll every 5 seconds to keep balance updated
+    const interval = setInterval(fetchBalance, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     if (status === 'win') {
       setShowResult('WINNER!');
+      fetchBalance(); // update balance after win
       setTimeout(() => setShowResult(null), 2000);
     } else if (status === 'loss') {
       setShowResult('LOSS');
+      fetchBalance(); // update balance after loss
       setTimeout(() => setShowResult(null), 2000);
     }
   }, [status]);
+
+  const handlePlaceBet = async (direction) => {
+    // Check if user has enough available balance
+    if (availableBalance < stake) {
+      setInsufficientFunds(true);
+      setTimeout(() => setInsufficientFunds(false), 3000);
+      return;
+    }
+    await placeBet(direction, stake);
+    // Balance will be updated via polling, but we can also fetch immediately
+    fetchBalance();
+  };
 
   return (
     <div className="min-h-screen bg-equal-bg font-mono relative overflow-hidden">
@@ -54,6 +107,13 @@ export default function OrbitBetPage() {
         </div>
       )}
 
+      {/* Insufficient Funds Toast */}
+      {insufficientFunds && (
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-red-500/90 text-white px-4 py-2 rounded-lg text-sm font-bold">
+          Insufficient funds! Please deposit.
+        </div>
+      )}
+
       {/* Result Toast */}
       {showResult && (
         <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-black/90 border-2 border-yellow-400 rounded-xl px-[clamp(20px,5vw,32px)] py-[clamp(12px,3vw,16px)] animate-bounce">
@@ -74,6 +134,9 @@ export default function OrbitBetPage() {
             </span>
             <span className="text-[clamp(12px,3.5vw,14px)] font-black text-white tracking-tight">
               ZAR {balance.toFixed(2)}
+            </span>
+            <span className="text-[clamp(7px,2vw,8px)] text-white/40">
+              Available: ZAR {availableBalance.toFixed(2)}
             </span>
           </div>
           
@@ -182,7 +245,7 @@ export default function OrbitBetPage() {
           {/* UP/DOWN Buttons */}
           <div className="flex gap-3">
             <button 
-              onClick={() => placeBet('UP', stake)} 
+              onClick={() => handlePlaceBet('UP')} 
               disabled={status === 'spinning'}
               className="flex-1 bg-green-500/20 border-2 border-green-500 rounded-xl py-[clamp(12px,3.5vw,14px)] text-green-400 font-black text-[clamp(11px,3vw,12px)] tracking-[4px] hover:bg-green-500 hover:text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase touch-manipulation"
               style={{ minHeight: '48px' }}
@@ -190,7 +253,7 @@ export default function OrbitBetPage() {
               ▲ UP
             </button>
             <button 
-              onClick={() => placeBet('DOWN', stake)} 
+              onClick={() => handlePlaceBet('DOWN')} 
               disabled={status === 'spinning'}
               className="flex-1 bg-red-500/20 border-2 border-red-500 rounded-xl py-[clamp(12px,3.5vw,14px)] text-red-400 font-black text-[clamp(11px,3vw,12px)] tracking-[4px] hover:bg-red-500 hover:text-black transition-all disabled:opacity-50 disabled:cursor-not-allowed uppercase touch-manipulation"
               style={{ minHeight: '48px' }}
