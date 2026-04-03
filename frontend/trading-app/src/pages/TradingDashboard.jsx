@@ -590,17 +590,19 @@ export default function TradingDashboard() {
           <div className="bg-[#0a0a1e] border border-[#1e1e3a] rounded-xl overflow-hidden flex flex-1 min-h-0">
             <DrawingToolbar activeTool={activeTool} onToolSelect={setActiveTool} />
             <div className="flex-1 min-w-0 min-h-0">
-              <CandleChart
-                livePrice={livePrice}
-                entry={entry}
-                takeProfit={takeProfit}
-                stopLoss={stopLoss}
-                onEntryChange={setEntry}
-                onTPChange={setTakeProfit}
-                onSLChange={setStopLoss}
-                isTradeActive={isCurrentTradeActive}
-                showControls={showControls}
-              />
+<CandleChart
+  livePrice={livePrice}
+  entry={entry}
+  takeProfit={takeProfit}
+  stopLoss={stopLoss}
+  onEntryChange={setEntry}
+  onTPChange={setTakeProfit}
+  onSLChange={setStopLoss}
+  isTradeActive={isCurrentTradeActive}
+  showControls={showControls}
+  activeTool={activeTool}
+  onToolSelect={setActiveTool}
+/>
             </div>
           </div>
         </div>
@@ -672,7 +674,7 @@ export default function TradingDashboard() {
             <div className="w-12 h-1 bg-[#3a3a6a] rounded-full" />
           </div>
 
-          <div className="px-3 pb-3 pt-1 space-y-2.5">
+          <div className="px-3 pb-3 pt-1 space-y-2.5 overflow-y-auto max-h-[70vh]">
             <div>
               <div className="text-[7px] text-[#5050a0] tracking-widest uppercase mb-1.5">Lot Size</div>
               <div className="flex gap-1.5">
