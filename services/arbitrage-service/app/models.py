@@ -37,5 +37,6 @@ class ArbTrade(Base):
     spread         = Column(Numeric(18, 6))
     fees           = Column(Numeric(18, 4))
     actual_profit  = Column(Numeric(18, 4))
+    platform_fee   = Column(Numeric(18, 4), default=0)
     status         = Column(String, default="EXECUTED")
     created_at     = Column(DateTime(timezone=True), server_default=func.now())
