@@ -5,15 +5,17 @@ from decimal import Decimal
 import uuid
 import httpx
 import os
+import logging
 
 from app.database import get_db
-from app.models import PendingOrder
+from app.models import PendingOrder, OpenTrade
 from app.schemas import PlaceOrderRequest, ActivateOrderRequest, OrderResponse
+from app.services.follow_client import notify_trade
 
 router = APIRouter(prefix="/api/orders", tags=["orders"])
+logger = logging.getLogger(__name__)
 
-WALLET_SERVICE_URL = os.getenv("WALLET_SERVICE_URL", "http://wallet-service:8002")
-
+WALLET_SERVICE_URL = os.getenv("WALLET_SERVICE_URL", "http://wallet-service:8000")
 LOT_PIP_VALUES = {
     "Macro": Decimal("0.10"),
     "Mini": Decimal("1.00"),
@@ -38,10 +40,8 @@ async def place_order(
 ):
     pip_value = LOT_PIP_VALUES.get(data.lot_size, Decimal("1.00"))
     margin = pip_value * Decimal("100") * Decimal(str(data.volume))
-    
     order_ref = str(uuid.uuid4())
     await reserve_margin(x_user_id, margin, order_ref)
-    
     order = PendingOrder(
         user_id=uuid.UUID(x_user_id),
         symbol=data.symbol,
@@ -57,7 +57,6 @@ async def place_order(
     db.add(order)
     await db.commit()
     await db.refresh(order)
-    
     return OrderResponse(
         id=order.id,
         symbol=order.symbol,
@@ -79,14 +78,10 @@ async def get_pending_orders(
 ):
     result = await db.execute(
         select(PendingOrder)
-        .where(and_(
-            PendingOrder.user_id == uuid.UUID(x_user_id),
-            PendingOrder.status == "PENDING"
-        ))
+        .where(and_(PendingOrder.user_id == uuid.UUID(x_user_id), PendingOrder.status == "PENDING"))
         .order_by(PendingOrder.created_at.desc())
     )
     orders = result.scalars().all()
-    
     return [
         OrderResponse(
             id=o.id,
@@ -100,8 +95,7 @@ async def get_pending_orders(
             margin=float(o.margin),
             status=o.status,
             created_at=o.created_at
-        )
-        for o in orders
+        ) for o in orders
     ]
 
 @router.delete("/{order_id}")
@@ -112,27 +106,17 @@ async def cancel_order(
 ):
     result = await db.execute(
         select(PendingOrder)
-        .where(and_(
-            PendingOrder.id == uuid.UUID(order_id),
-            PendingOrder.user_id == uuid.UUID(x_user_id),
-            PendingOrder.status == "PENDING"
-        ))
+        .where(and_(PendingOrder.id == uuid.UUID(order_id), PendingOrder.user_id == uuid.UUID(x_user_id), PendingOrder.status == "PENDING"))
     )
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
     async with httpx.AsyncClient() as client:
         await client.post(
             f"{WALLET_SERVICE_URL}/api/wallet/release",
-            json={
-                "amount": float(order.margin),
-                "reference": str(order.id),
-                "pnl": 0
-            },
+            json={"amount": float(order.margin), "reference": str(order.id), "pnl": 0},
             headers={"X-User-ID": x_user_id}
         )
-    
     order.status = "CANCELLED"
     await db.commit()
     return {"message": "Order cancelled"}
@@ -144,20 +128,13 @@ async def activate_order(
     x_user_id: str = Header(...),
     db: AsyncSession = Depends(get_db)
 ):
-    from app.models import OpenTrade
-    
     result = await db.execute(
         select(PendingOrder)
-        .where(and_(
-            PendingOrder.id == uuid.UUID(order_id),
-            PendingOrder.user_id == uuid.UUID(x_user_id),
-            PendingOrder.status == "PENDING"
-        ))
+        .where(and_(PendingOrder.id == uuid.UUID(order_id), PendingOrder.user_id == uuid.UUID(x_user_id), PendingOrder.status == "PENDING"))
     )
     order = result.scalar_one_or_none()
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
-    
     trade = OpenTrade(
         user_id=order.user_id,
         symbol=order.symbol,
@@ -173,7 +150,11 @@ async def activate_order(
     order.status = "ACTIVATED"
     await db.commit()
     await db.refresh(trade)
-    
+    # Notify followers
+    try:
+        await notify_trade(x_user_id, str(trade.id), trade.symbol)
+    except Exception as e:
+        logger.error(f"Failed to notify followers: {e}")
     return {
         "id": str(trade.id),
         "symbol": trade.symbol,

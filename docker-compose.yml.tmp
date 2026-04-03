@@ -1,0 +1,17 @@
+# ... (keep your existing docker-compose.yml but ensure this section is correct)
+  trading-service:
+    build: ./services/trading-service
+    ports:
+      - "8003:8000"
+    env_file: .env
+    environment:
+      - WALLET_SERVICE_URL=http://wallet-service:8000
+      - TRADING_SERVICE_URL=http://trading-service:8000
+    depends_on:
+      trading-db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      wallet-service:
+        condition: service_started
+    restart: unless-stopped

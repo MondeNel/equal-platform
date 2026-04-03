@@ -66,3 +66,19 @@ class PlayerStatsResponse(BaseModel):
     total_wins: int
     total_losses: int
     total_bets: int
+
+class CopyTradeRequest(BaseModel):
+    original_trade_id: str
+    lot_size: str
+    volume: int = 1
+
+class CopyTradeResponse(BaseModel):
+    id: str
+    copy_trade_id: str
+    symbol: str
+    direction: str
+    lot_size: str
+    volume: int
+    entry_price: float
+    margin: float
+    created_at: str

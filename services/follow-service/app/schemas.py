@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from decimal import Decimal
+from datetime import datetime
 
 
 class UpdateTraderStatsRequest(BaseModel):
@@ -16,9 +17,41 @@ class UpdateTraderStatsRequest(BaseModel):
 
 
 class CopyTradeRequest(BaseModel):
-    trader_id:        str
-    original_trade_id:str
-    symbol:           str
-    direction:        str
-    lot_size:         str
-    volume:           int = 1
+    trader_id:         str
+    original_trade_id: str
+    symbol:            str
+    lot_size:          str
+    volume:            int = 1
+    # direction is NOT provided by follower; trading app will fetch it from original trade
+
+
+class SubscribeRequest(BaseModel):
+    plan: str = "monthly"
+
+
+class CopyLimitResponse(BaseModel):
+    can_copy: bool
+    free_copies_used: int
+    daily_free_limit: int
+    subscription_active: bool
+    next_reset_date: Optional[str] = None
+    message: Optional[str] = None
+
+
+class CloseCopyTradeRequest(BaseModel):
+    copy_trade_id: str
+    profit: Decimal
+
+
+class TradeNotificationRequest(BaseModel):
+    trader_id:         str
+    original_trade_id: str
+    symbol:            str
+
+
+class TradeNotificationResponse(BaseModel):
+    id: str
+    trader_id: str
+    symbol: str
+    original_trade_id: str
+    created_at: datetime

@@ -5,7 +5,6 @@ from app.database import Base
 
 class PendingOrder(Base):
     __tablename__ = "pending_orders"
-
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     symbol = Column(String, nullable=False)
@@ -19,10 +18,8 @@ class PendingOrder(Base):
     status = Column(String, default="PENDING")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-
 class OpenTrade(Base):
     __tablename__ = "open_trades"
-
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     symbol = Column(String, nullable=False)
@@ -34,11 +31,10 @@ class OpenTrade(Base):
     stop_loss = Column(Numeric(18, 6), nullable=True)
     margin = Column(Numeric(18, 4), nullable=False)
     opened_at = Column(DateTime(timezone=True), server_default=func.now())
-
+    copy_trade_id = Column(UUID(as_uuid=True), nullable=True, index=True)
 
 class TradeHistory(Base):
     __tablename__ = "trade_history"
-
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     symbol = Column(String, nullable=False)
@@ -53,30 +49,27 @@ class TradeHistory(Base):
     close_reason = Column(String, nullable=False)
     opened_at = Column(DateTime(timezone=True), nullable=False)
     closed_at = Column(DateTime(timezone=True), server_default=func.now())
-
+    copy_trade_id = Column(UUID(as_uuid=True), nullable=True, index=True)
 
 class PlayerStats(Base):
     __tablename__ = "player_stats"
-
     user_id = Column(UUID(as_uuid=True), primary_key=True)
     win_streak = Column(Integer, default=0)
     max_streak = Column(Integer, default=0)
     total_wins = Column(Integer, default=0)
     total_losses = Column(Integer, default=0)
     total_bets = Column(Integer, default=0)
-    milestones_offered = Column(String, default="")  # comma-separated milestones already offered
+    milestones_offered = Column(String, default="")
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
-
 
 class PendingBonus(Base):
     __tablename__ = "pending_bonuses"
-
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     trade_id = Column(UUID(as_uuid=True), nullable=False)
     user_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     base_pnl = Column(Numeric(18, 4), nullable=False)
     multiplier = Column(Numeric(5, 2), nullable=False)
     milestone = Column(Integer, nullable=False)
-    close_price = Column(Numeric(18, 6), nullable=False)  # price at which trade was closed
+    close_price = Column(Numeric(18, 6), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    status = Column(String, default="PENDING")  # PENDING, PROCESSED
+    status = Column(String, default="PENDING")

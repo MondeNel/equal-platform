@@ -5,6 +5,7 @@ import os
 
 from app.database import engine, Base
 from app.routers.wallet import router as wallet_router
+from app.routers.wallet_debit_credit import router as debit_credit_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -26,6 +27,7 @@ app.add_middleware(
 )
 
 app.include_router(wallet_router)
+app.include_router(debit_credit_router)
 
 @app.get("/health")
 async def health():
