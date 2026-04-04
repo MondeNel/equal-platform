@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.router import router
 import os
 
 app = FastAPI(title="eQual Gateway", version="1.0.0")
@@ -15,8 +14,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router)
+@app.get("/")
+async def root():
+    return {"service": "eQual Gateway", "status": "running"}
 
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": "gateway"}
+
+# Import router after app creation to avoid circular imports
+try:
+    from app.router import router
+    app.include_router(router)
+except ImportError as e:
+    print(f"Router import error: {e}")
