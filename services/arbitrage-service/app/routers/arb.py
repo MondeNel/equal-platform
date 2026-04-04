@@ -159,3 +159,35 @@ async def get_arb_history(
         }
         for t in trades
     ]
+
+@router.get("/order-types")
+async def get_order_types():
+    """Get available order types for arbitrage"""
+    return {
+        "market": {
+            "description": "Execute immediately at current market prices",
+            "execution_time": "Instant",
+            "risk": "Low - price may move during execution"
+        },
+        "limit": {
+            "description": "Execute only when spread reaches target percentage",
+            "execution_time": "Variable - up to expiry time",
+            "risk": "Medium - may not execute if target not reached"
+        }
+    }
+
+@router.get("/order-types")
+async def get_order_types():
+    """Get available order types for arbitrage"""
+    return {
+        "market": {
+            "description": "Execute immediately at current market prices",
+            "execution_time": "Instant",
+            "risk": "Low - price may move during execution"
+        },
+        "limit": {
+            "description": "Execute only when spread reaches target percentage",
+            "execution_time": "Variable - up to expiry time",
+            "risk": "Medium - may not execute if target not reached"
+        }
+    }
