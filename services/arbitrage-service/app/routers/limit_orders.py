@@ -18,7 +18,7 @@ async def create_limit_order(
     x_user_id: str = Header(...),
     db: AsyncSession = Depends(get_db),
 ):
-    """Create a limit order that will execute when spread reaches target"""
+    """Create a limit order that executes when buy exchange price reaches target"""
     user_id = uuid.UUID(x_user_id)
     
     # Validate amount
@@ -27,11 +27,8 @@ async def create_limit_order(
     if data.amount > 100000:
         raise HTTPException(status_code=400, detail="Maximum amount is ZAR 100,000")
     
-    # Validate target spread
-    if data.target_spread_pct < 0.1:
-        raise HTTPException(status_code=400, detail="Target spread must be at least 0.1%")
-    if data.target_spread_pct > 10:
-        raise HTTPException(status_code=400, detail="Target spread cannot exceed 10%")
+    # For limit orders, we store target_spread_pct as target_buy_price (simplified)
+    # We'll rename in database later, but for now use the same field
     
     # Create limit order
     expires_at = datetime.utcnow() + timedelta(minutes=data.expires_in_minutes)
@@ -41,7 +38,7 @@ async def create_limit_order(
         buy_exchange=data.buy_exchange,
         sell_exchange=data.sell_exchange,
         amount=data.amount,
-        target_spread_pct=Decimal(str(data.target_spread_pct)),
+        target_spread_pct=Decimal(str(data.target_spread_pct)),  # This now stores target buy price
         expires_at=expires_at,
         status="PENDING"
     )
@@ -83,7 +80,7 @@ async def get_pending_orders(
             "buy_exchange": o.buy_exchange,
             "sell_exchange": o.sell_exchange,
             "amount": float(o.amount),
-            "target_spread_pct": float(o.target_spread_pct),
+            "target_buy_price": float(o.target_spread_pct),  # Target price for buy exchange
             "expires_at": o.expires_at.isoformat(),
             "created_at": o.created_at.isoformat(),
         }
@@ -135,8 +132,8 @@ async def get_limit_order_history(
             "buy_exchange": h.buy_exchange,
             "sell_exchange": h.sell_exchange,
             "amount": float(h.amount),
-            "target_spread_pct": float(h.target_spread_pct),
-            "executed_spread_pct": float(h.executed_spread_pct) if h.executed_spread_pct else None,
+            "target_buy_price": float(h.target_spread_pct),
+            "executed_price": float(h.executed_price) if h.executed_price else None,
             "executed_profit": float(h.executed_profit) if h.executed_profit else None,
             "status": h.status,
             "created_at": h.created_at.isoformat(),
