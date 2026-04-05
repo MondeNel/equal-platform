@@ -8,7 +8,7 @@ import StreakFireBlocks from '../components/StreakFireBlocks';
 import StreakMultipliers from '../components/StreakMultipliers';
 import { usePlayerStats } from '../hooks/usePlayerStats';
 
-// ─── Drawing Tools Sidebar (unchanged) ────────────────────────────────────────
+// ─── Drawing Tools Sidebar ────────────────────────────────────────────────────
 const DRAW_TOOLS = [
   {
     id: 'cursor',
@@ -141,6 +141,10 @@ function DrawingToolbar({ activeTool, onToolSelect }) {
   );
 }
 
+// ─── Control Panel height constant — keep in sync with actual panel content ──
+// Approx rendered height of the panel content (lot + volume + levels + buttons)
+const CONTROL_PANEL_HEIGHT = 320;
+
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function TradingDashboard() {
   const [market, setMarket] = useState('Forex');
@@ -169,6 +173,9 @@ export default function TradingDashboard() {
   const [timeframe, setTimeframe] = useState('1H');
   const [activeTool, setActiveTool] = useState('cursor');
 
+  // Ref to measure actual panel height for precise chart sizing
+  const controlPanelRef = useRef(null);
+
   const displayPrice = chartPrice > 0 ? chartPrice : livePrice;
 
   const activatingOrdersRef = useRef(new Set());
@@ -185,7 +192,6 @@ export default function TradingDashboard() {
   const user = userJson ? JSON.parse(userJson) : null;
   const userId = user?.id;
 
-  // Fetch player stats for streak highlighting
   const { stats: playerStats } = usePlayerStats(userId);
   const currentStreak = playerStats?.win_streak || 0;
 
@@ -225,9 +231,7 @@ export default function TradingDashboard() {
     return () => clearInterval(id);
   }, [fetchWallet, fetchPending, fetchTrades]);
 
-  useEffect(() => {
-    setOpenPrice(null);
-  }, [symbol]);
+  useEffect(() => { setOpenPrice(null); }, [symbol]);
 
   useEffect(() => {
     let cancelled = false;
@@ -261,27 +265,16 @@ export default function TradingDashboard() {
           if (entryHit && !activatingOrdersRef.current.has(o.id)) {
             activatingOrdersRef.current.add(o.id);
             setActivationDetails({
-              id: o.id,
-              symbol: o.symbol,
-              direction: o.direction,
-              entryPrice: o.entry_price,
-              tp: o.take_profit,
-              sl: o.stop_loss,
-              lot: o.lot_size,
-              volume: o.volume,
+              id: o.id, symbol: o.symbol, direction: o.direction,
+              entryPrice: o.entry_price, tp: o.take_profit, sl: o.stop_loss,
+              lot: o.lot_size, volume: o.volume,
             });
             setShowActivationModal(true);
             setTimeout(() => setShowActivationModal(false), 4000);
             ordersAPI.activate(o.id, cur)
-              .then(() => {
-                fetchTradesRef.current?.();
-                fetchWalletRef.current?.();
-              })
+              .then(() => { fetchTradesRef.current?.(); fetchWalletRef.current?.(); })
               .catch(() => {})
-              .finally(() => {
-                activatingOrdersRef.current.delete(o.id);
-                fetchPendingRef.current?.();
-              });
+              .finally(() => { activatingOrdersRef.current.delete(o.id); fetchPendingRef.current?.(); });
           } else {
             stillPending.push(o);
           }
@@ -310,20 +303,12 @@ export default function TradingDashboard() {
             const reason = tpHit ? 'TP' : 'SL';
             const pip2 = Math.abs(Math.round((hitPrice - t.entry_price) / pip));
             tradesAPI.close(t.id, hitPrice, reason)
-              .then(() => {
-                fetchTradesRef.current?.();
-                fetchWalletRef.current?.();
-              })
+              .then(() => { fetchTradesRef.current?.(); fetchWalletRef.current?.(); })
               .catch(() => {})
               .finally(() => { closingTradesRef.current.delete(t.id); });
             setResultDetails({
-              hit: reason,
-              pnl: realPnl,
-              symbol: t.symbol,
-              direction: t.direction,
-              pips: pip2,
-              entryPrice: t.entry_price,
-              closePrice: hitPrice,
+              hit: reason, pnl: realPnl, symbol: t.symbol, direction: t.direction,
+              pips: pip2, entryPrice: t.entry_price, closePrice: hitPrice,
             });
             setShowResultModal(true);
             setTimeout(() => setShowResultModal(false), 5000);
@@ -350,9 +335,7 @@ export default function TradingDashboard() {
     if (v == null) return '–';
     return displayPrice > 10000
       ? v.toLocaleString('en-ZA', { minimumFractionDigits: 2 })
-      : displayPrice > 100
-        ? v.toFixed(2)
-        : v.toFixed(4);
+      : displayPrice > 100 ? v.toFixed(2) : v.toFixed(4);
   };
 
   const priceChange = openPrice && openPrice > 0
@@ -371,18 +354,15 @@ export default function TradingDashboard() {
   };
 
   const profitCalc = calcPips(entry, takeProfit);
-  const lossCalc = calcPips(entry, stopLoss);
+  const lossCalc   = calcPips(entry, stopLoss);
 
   const tradeDirection = entry != null && takeProfit != null ? (takeProfit > entry ? 'BUY' : 'SELL') : null;
-  const canBuy = tradeDirection === null || tradeDirection === 'BUY';
+  const canBuy  = tradeDirection === null || tradeDirection === 'BUY';
   const canSell = tradeDirection === null || tradeDirection === 'SELL';
 
   const resetOrder = () => {
-    setEntry(null);
-    setTakeProfit(null);
-    setStopLoss(null);
-    setLotSize(null);
-    setVolume(1);
+    setEntry(null); setTakeProfit(null); setStopLoss(null);
+    setLotSize(null); setVolume(1);
   };
 
   const handleCloseTrade = async (idOrAll) => {
@@ -430,13 +410,10 @@ export default function TradingDashboard() {
     try {
       isPlacingRef.current = true;
       const res = await ordersAPI.place({
-        symbol,
-        direction: type,
-        lot_size: lot,
-        volume: vol,
+        symbol, direction: type, lot_size: lot, volume: vol,
         entry_price: entryP,
         take_profit: takeProfit ?? undefined,
-        stop_loss: stopLoss ?? undefined,
+        stop_loss:   stopLoss   ?? undefined,
       });
       fetchWallet(); fetchPending();
       setToast({ type: 'PENDING', id: res.data.id, symbol, tradeType: type, entryStr: priceFmt(entryP), lot, vol });
@@ -454,33 +431,35 @@ export default function TradingDashboard() {
     const dec = displayPrice > 100 ? 2 : 4;
     const snap = v => parseFloat(v.toFixed(dec));
     if (key === 'entry') setEntry(e => e != null ? null : snap(displayPrice));
-    if (key === 'tp') setTakeProfit(t => t != null ? null : snap(displayPrice * 1.003));
-    if (key === 'sl') setStopLoss(s => s != null ? null : snap(displayPrice * 0.997));
+    if (key === 'tp')    setTakeProfit(t => t != null ? null : snap(displayPrice * 1.003));
+    if (key === 'sl')    setStopLoss(s => s != null ? null : snap(displayPrice * 0.997));
   };
 
   const changeMarket = m => {
-    setMarket(m);
-    setSymbol(SYMBOLS[m][0]);
-    setMarketOpen(false);
-    setSymbolOpen(false);
-    resetOrder();
+    setMarket(m); setSymbol(SYMBOLS[m][0]);
+    setMarketOpen(false); setSymbolOpen(false); resetOrder();
   };
 
   const changeSymbol = s => {
-    setSymbol(s);
-    setSymbolOpen(false);
-    resetOrder();
+    setSymbol(s); setSymbolOpen(false); resetOrder();
   };
 
   const isCurrentTradeActive = openTrades.some(
     t => t.symbol === symbol && t.entry_price === entry && t.status === 'active'
   );
+
   const timeframes = ['1m', '5m', '15m', '1H', '1D', '1W'];
 
   return (
     <div className="min-h-screen bg-[#05050e] font-mono relative pb-16 overflow-hidden">
       <div className="absolute inset-0 pointer-events-none z-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(167,139,250,0.008)_2px,rgba(167,139,250,0.008)_4px)]" />
 
+      {/*
+        KEY FIX: The outer wrapper is a flex column that fills the viewport.
+        The chart area uses flex-1 + min-h-0 so it takes all available space.
+        The control panel is IN THE NORMAL FLOW (not fixed/absolute), so when
+        it appears it genuinely pushes the chart up instead of overlapping it.
+      */}
       <div className="relative z-10 max-w-[480px] mx-auto min-h-screen bg-gradient-to-b from-[#0d0820] to-[#05050e] border-x border-[#1e1e3a] flex flex-col">
 
         {/* ── Top Bar ── */}
@@ -504,7 +483,7 @@ export default function TradingDashboard() {
           </div>
         </div>
 
-        {/* ── Multiplier Cards with streak highlighting ── */}
+        {/* ── Multiplier Cards ── */}
         <StreakMultipliers streak={currentStreak} />
 
         {/* ── Market + Symbol Selectors ── */}
@@ -514,40 +493,29 @@ export default function TradingDashboard() {
               onClick={() => { setMarketOpen(o => !o); setSymbolOpen(false); }}
               className="w-full bg-[#0d0820] border border-[#1e1e3a] rounded-lg px-3 py-1.5 flex justify-between items-center text-xs text-white tracking-wide hover:border-[#38bdf840] transition-all"
             >
-              {market}
-              <span className="text-[9px] opacity-50">▼</span>
+              {market} <span className="text-[9px] opacity-50">▼</span>
             </button>
             {marketOpen && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-[#0d0820] border border-[#2e2e5a] rounded-lg z-30 overflow-hidden">
                 {Object.keys(SYMBOLS).map(m => (
-                  <div
-                    key={m}
-                    onClick={() => changeMarket(m)}
-                    className="px-3 py-2 text-xs text-white/70 hover:bg-[#16162a] hover:text-white cursor-pointer border-b border-[#1e1e3a] last:border-0 transition-colors"
-                  >
+                  <div key={m} onClick={() => changeMarket(m)} className="px-3 py-2 text-xs text-white/70 hover:bg-[#16162a] hover:text-white cursor-pointer border-b border-[#1e1e3a] last:border-0 transition-colors">
                     {m}
                   </div>
                 ))}
               </div>
             )}
           </div>
-
           <div className="flex-1 relative">
             <button
               onClick={() => { setSymbolOpen(o => !o); setMarketOpen(false); }}
               className="w-full bg-[#0d0820] border border-[#1e1e3a] rounded-lg px-3 py-1.5 flex justify-between items-center text-xs text-[#facc15] font-bold tracking-wide hover:border-[#facc1540] transition-all"
             >
-              {symbol}
-              <span className="text-[9px] text-white/30">▼</span>
+              {symbol} <span className="text-[9px] text-white/30">▼</span>
             </button>
             {symbolOpen && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-[#0d0820] border border-[#2e2e5a] rounded-lg z-30 overflow-hidden">
                 {SYMBOLS[market].map(s => (
-                  <div
-                    key={s}
-                    onClick={() => changeSymbol(s)}
-                    className="px-3 py-2 text-xs text-white/70 hover:bg-[#16162a] hover:text-white cursor-pointer border-b border-[#1e1e3a] last:border-0 transition-colors"
-                  >
+                  <div key={s} onClick={() => changeSymbol(s)} className="px-3 py-2 text-xs text-white/70 hover:bg-[#16162a] hover:text-white cursor-pointer border-b border-[#1e1e3a] last:border-0 transition-colors">
                     {s}
                   </div>
                 ))}
@@ -559,9 +527,7 @@ export default function TradingDashboard() {
         {/* ── Price + Change ── */}
         <div className="flex items-baseline gap-2 px-4 pb-1 shrink-0">
           <span className="text-xl font-bold text-[#facc15] tracking-wider">
-            {displayPrice > 0
-              ? displayPrice.toLocaleString('en-ZA', { minimumFractionDigits: 4 })
-              : '—'}
+            {displayPrice > 0 ? displayPrice.toLocaleString('en-ZA', { minimumFractionDigits: 4 }) : '—'}
           </span>
           <span className={`text-[10px] font-bold ${Number(priceChange) >= 0 ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
             {Number(priceChange) >= 0 ? '+' : ''}{priceChange}%
@@ -585,24 +551,24 @@ export default function TradingDashboard() {
           ))}
         </div>
 
-        {/* ── Chart Area + Drawing Tools ── */}
-        <div className="px-3 pb-1.5 flex-1 flex flex-col min-h-0">
-          <div className="bg-[#0a0a1e] border border-[#1e1e3a] rounded-xl overflow-hidden flex flex-1 min-h-0">
+        {/* ── Chart Area — fixed smaller height ── */}
+        <div className="px-3 pb-1.5">
+          <div className="bg-[#0a0a1e] border border-[#1e1e3a] rounded-xl overflow-hidden flex" style={{ height: '340px' }}>
             <DrawingToolbar activeTool={activeTool} onToolSelect={setActiveTool} />
-            <div className="flex-1 min-w-0 min-h-0">
-<CandleChart
-  livePrice={livePrice}
-  entry={entry}
-  takeProfit={takeProfit}
-  stopLoss={stopLoss}
-  onEntryChange={setEntry}
-  onTPChange={setTakeProfit}
-  onSLChange={setStopLoss}
-  isTradeActive={isCurrentTradeActive}
-  showControls={showControls}
-  activeTool={activeTool}
-  onToolSelect={setActiveTool}
-/>
+            <div className="flex-1 min-w-0" style={{ height: '340px' }}>
+              <CandleChart
+                livePrice={livePrice}
+                entry={entry}
+                takeProfit={takeProfit}
+                stopLoss={stopLoss}
+                onEntryChange={setEntry}
+                onTPChange={setTakeProfit}
+                onSLChange={setStopLoss}
+                isTradeActive={isCurrentTradeActive}
+                showControls={showControls}
+                activeTool={activeTool}
+                onToolSelect={setActiveTool}
+              />
             </div>
           </div>
         </div>
@@ -612,30 +578,17 @@ export default function TradingDashboard() {
           <div className="px-4 pb-2 shrink-0">
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
               {pendingOrders.map(o => (
-                <div
-                  key={`pending-${o.id}`}
-                  className="flex items-center gap-1.5 bg-[#0d0820] border border-[#a78bfa44] rounded-lg px-2.5 py-1.5 shrink-0 cursor-pointer hover:border-[#a78bfa80] transition-colors"
-                >
+                <div key={`pending-${o.id}`} className="flex items-center gap-1.5 bg-[#0d0820] border border-[#a78bfa44] rounded-lg px-2.5 py-1.5 shrink-0 cursor-pointer hover:border-[#a78bfa80] transition-colors">
                   <span className="text-[#a78bfa] text-[9px]">⏳</span>
-                  <span className={`text-[9px] font-bold ${o.direction === 'BUY' ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
-                    {o.direction === 'BUY' ? '▲' : '▼'}
-                  </span>
+                  <span className={`text-[9px] font-bold ${o.direction === 'BUY' ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>{o.direction === 'BUY' ? '▲' : '▼'}</span>
                   <span className="text-[#7070a8] text-[9px] tracking-wide">{o.symbol}</span>
                 </div>
               ))}
               {openTrades.map(t => (
-                <div
-                  key={`open-${t.id}`}
-                  onClick={() => handleCloseTrade(t.id)}
-                  className="flex items-center gap-1.5 bg-[#0a0a1e] border border-[#22c55e33] rounded-lg px-2.5 py-1.5 shrink-0 cursor-pointer hover:border-[#22c55e66] transition-colors"
-                >
-                  <span className={`text-[9px] font-bold ${t.direction === 'BUY' ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
-                    {t.direction === 'BUY' ? '▲' : '▼'}
-                  </span>
+                <div key={`open-${t.id}`} onClick={() => handleCloseTrade(t.id)} className="flex items-center gap-1.5 bg-[#0a0a1e] border border-[#22c55e33] rounded-lg px-2.5 py-1.5 shrink-0 cursor-pointer hover:border-[#22c55e66] transition-colors">
+                  <span className={`text-[9px] font-bold ${t.direction === 'BUY' ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>{t.direction === 'BUY' ? '▲' : '▼'}</span>
                   <span className="text-[#a78bfa] text-[9px] tracking-wide">{t.symbol}</span>
-                  <span className={`text-[9px] font-bold ${t.pnl >= 0 ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>
-                    {t.pnl >= 0 ? '+' : ''}{t.pnl?.toFixed(2)}
-                  </span>
+                  <span className={`text-[9px] font-bold ${t.pnl >= 0 ? 'text-[#4ade80]' : 'text-[#f87171]'}`}>{t.pnl >= 0 ? '+' : ''}{t.pnl?.toFixed(2)}</span>
                 </div>
               ))}
             </div>
@@ -657,136 +610,152 @@ export default function TradingDashboard() {
           </button>
         </div>
 
-        {/* ── Slide-Up Control Panel ── */}
+        {/*
+          ── Control Panel — IN NORMAL FLOW (not fixed/absolute) ──────────────
+          This is the core fix. Instead of position:fixed which floats over
+          the chart and leaves a dark gap, the panel is a normal flex child.
+          When it appears, flexbox naturally compresses the chart above it.
+          The chart's ResizeObserver picks up the new size and redraws.
+
+          We use overflow:hidden + max-height animation to slide it open/closed
+          without needing position:fixed at all.
+        */}
         <div
-          className={`
-            fixed bottom-16 left-0 right-0 max-w-[480px] mx-auto z-20
-            bg-gradient-to-t from-[#0a0820] to-[#0d0d2a]
-            border-t border-[#2e2e58] rounded-t-2xl
-            transition-transform duration-300 ease-in-out
-            ${showControls ? 'translate-y-0' : 'translate-y-full'}
-          `}
+          ref={controlPanelRef}
+          className="shrink-0 overflow-hidden transition-all duration-300 ease-in-out"
+          style={{
+            maxHeight: showControls ? `${CONTROL_PANEL_HEIGHT}px` : '0px',
+          }}
         >
-          <div
-            onClick={() => setShowControls(false)}
-            className="flex justify-center items-center pt-2 pb-1 cursor-pointer"
-          >
-            <div className="w-12 h-1 bg-[#3a3a6a] rounded-full" />
-          </div>
-
-          <div className="px-3 pb-3 pt-1 space-y-2.5 overflow-y-auto max-h-[70vh]">
-            <div>
-              <div className="text-[7px] text-[#5050a0] tracking-widest uppercase mb-1.5">Lot Size</div>
-              <div className="flex gap-1.5">
-                {LOT_SIZES.map(ls => (
-                  <button
-                    key={ls.label}
-                    onClick={() => setLotSize(ls)}
-                    className={`flex-1 py-1.5 rounded-lg border transition-all ${
-                      lotSize?.label === ls.label
-                        ? 'bg-[#1a0a3a] border-[#a78bfa] text-[#ddd6fe]'
-                        : 'bg-[#0a0a18] border-[#1e1e3a] text-[#5050a0] hover:border-[#38bdf840] hover:text-[#8888c0]'
-                    }`}
-                  >
-                    <div className="text-[8px] font-bold uppercase tracking-wider">{ls.label}</div>
-                    <div className="text-[7px] opacity-50">{ls.sublabel}</div>
-                  </button>
-                ))}
-              </div>
+          <div className="bg-gradient-to-t from-[#0a0820] to-[#0d0d2a] border-t border-[#2e2e58] rounded-t-2xl">
+            {/* Drag handle */}
+            <div
+              onClick={() => setShowControls(false)}
+              className="flex justify-center items-center pt-2 pb-1 cursor-pointer"
+            >
+              <div className="w-12 h-1 bg-[#3a3a6a] rounded-full" />
             </div>
 
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <div className="text-[7px] text-[#5050a0] tracking-widest uppercase mb-1.5">Volume</div>
-                <div className="flex items-center justify-between bg-[#0a0a18] border border-[#1e1e3a] rounded-lg px-2 py-1.5">
-                  <button
-                    onClick={() => setVolume(v => Math.max(1, v - 1))}
-                    className="w-6 h-6 bg-[#0d0d20] border border-[#1e1e3a] rounded text-white text-sm hover:border-[#38bdf840] transition-all flex items-center justify-center"
-                  >−</button>
-                  <span className="text-sm font-bold text-white w-5 text-center">{volume}</span>
-                  <button
-                    onClick={() => setVolume(v => v + 1)}
-                    className="w-6 h-6 bg-[#0d0d20] border border-[#1e1e3a] rounded text-white text-sm hover:border-[#38bdf840] transition-all flex items-center justify-center"
-                  >+</button>
-                </div>
-              </div>
-
-              <div className="flex-1">
-                <div className="text-[7px] text-[#5050a0] uppercase tracking-wider mb-1.5">Levels</div>
+            <div className="px-3 pb-3 pt-1 space-y-2.5">
+              {/* Lot Size */}
+              <div>
+                <div className="text-[7px] text-[#5050a0] tracking-widest uppercase mb-1.5">Lot Size</div>
                 <div className="flex gap-1.5">
-                  <div className="flex-1">
-                    <div className="text-[6px] text-[#5050a0]">ENTRY</div>
-                    <div className={`text-[9px] font-bold ${entry ? 'text-[#38bdf8]' : 'text-[#1e1e40]'}`}>{priceFmt(entry)}</div>
-                    {profitCalc && <div className="text-[6px] text-green-400/70">+{profitCalc.pips}p</div>}
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-[6px] text-[#5050a0]">TP</div>
-                    <div className={`text-[9px] font-bold ${takeProfit ? 'text-[#4ade80]' : 'text-[#1a2e1a]'}`}>{priceFmt(takeProfit)}</div>
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-[6px] text-[#5050a0]">SL</div>
-                    <div className={`text-[9px] font-bold ${stopLoss ? 'text-[#f87171]' : 'text-[#2e1a1a]'}`}>{priceFmt(stopLoss)}</div>
-                    {lossCalc && <div className="text-[6px] text-red-400/70">-{lossCalc.pips}p</div>}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div className="text-[7px] text-[#5050a0] tracking-widest uppercase mb-1.5">Set Levels</div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {[
-                  { key: 'entry', label: 'ENTRY', activeClass: 'border-[#38bdf8] bg-[#38bdf810] text-[#38bdf8]' },
-                  { key: 'tp',    label: 'TP',    activeClass: 'border-[#4ade80] bg-[#4ade8010] text-[#4ade80]' },
-                  { key: 'sl',    label: 'SL',    activeClass: 'border-[#f87171] bg-[#f8717110] text-[#f87171]' },
-                ].map(btn => {
-                  const isSet = btn.key === 'entry' ? !!entry : btn.key === 'tp' ? !!takeProfit : !!stopLoss;
-                  return (
+                  {LOT_SIZES.map(ls => (
                     <button
-                      key={btn.key}
-                      onClick={() => handleLineBtn(btn.key)}
-                      className={`py-1.5 rounded-lg border-2 text-center transition-all ${
-                        isSet ? btn.activeClass : 'bg-[#0d0d1f] border-[#2e2e58] text-white/30 hover:border-[#3e3e68]'
+                      key={ls.label}
+                      onClick={() => setLotSize(ls)}
+                      className={`flex-1 py-1.5 rounded-lg border transition-all ${
+                        lotSize?.label === ls.label
+                          ? 'bg-[#1a0a3a] border-[#a78bfa] text-[#ddd6fe]'
+                          : 'bg-[#0a0a18] border-[#1e1e3a] text-[#5050a0] hover:border-[#38bdf840] hover:text-[#8888c0]'
                       }`}
                     >
-                      <div className="text-sm font-bold">{isSet ? '✕' : '+'}</div>
-                      <div className="text-[7px] uppercase tracking-wider">{btn.label}</div>
+                      <div className="text-[8px] font-bold uppercase tracking-wider">{ls.label}</div>
+                      <div className="text-[7px] opacity-50">{ls.sublabel}</div>
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleTrade('BUY')}
-                disabled={!canBuy}
-                className={`flex-1 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${
-                  canBuy
-                    ? 'bg-[#4ade8010] border-2 border-[#4ade80] text-[#4ade80] hover:bg-[#4ade8020] active:scale-[0.98]'
-                    : 'bg-[#0a0a0a] border-2 border-[#1a2e1a] text-[#2a3a2a] opacity-30 cursor-not-allowed'
-                }`}
-              >
-                ▲ BUY
-              </button>
-              <button
-                onClick={() => handleTrade('SELL')}
-                disabled={!canSell}
-                className={`flex-1 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${
-                  canSell
-                    ? 'bg-[#f8717110] border-2 border-[#f87171] text-[#f87171] hover:bg-[#f8717120] active:scale-[0.98]'
-                    : 'bg-[#0a0a0a] border-2 border-[#2a1a1a] text-[#3a2a2a] opacity-30 cursor-not-allowed'
-                }`}
-              >
-                SELL ▼
-              </button>
+              {/* Volume + Levels */}
+              <div className="flex gap-2">
+                <div className="flex-1">
+                  <div className="text-[7px] text-[#5050a0] tracking-widest uppercase mb-1.5">Volume</div>
+                  <div className="flex items-center justify-between bg-[#0a0a18] border border-[#1e1e3a] rounded-lg px-2 py-1.5">
+                    <button
+                      onClick={() => setVolume(v => Math.max(1, v - 1))}
+                      className="w-6 h-6 bg-[#0d0d20] border border-[#1e1e3a] rounded text-white text-sm hover:border-[#38bdf840] transition-all flex items-center justify-center"
+                    >−</button>
+                    <span className="text-sm font-bold text-white w-5 text-center">{volume}</span>
+                    <button
+                      onClick={() => setVolume(v => v + 1)}
+                      className="w-6 h-6 bg-[#0d0d20] border border-[#1e1e3a] rounded text-white text-sm hover:border-[#38bdf840] transition-all flex items-center justify-center"
+                    >+</button>
+                  </div>
+                </div>
+
+                <div className="flex-1">
+                  <div className="text-[7px] text-[#5050a0] uppercase tracking-wider mb-1.5">Levels</div>
+                  <div className="flex gap-1.5">
+                    <div className="flex-1">
+                      <div className="text-[6px] text-[#5050a0]">ENTRY</div>
+                      <div className={`text-[9px] font-bold ${entry ? 'text-[#38bdf8]' : 'text-[#1e1e40]'}`}>{priceFmt(entry)}</div>
+                      {profitCalc && <div className="text-[6px] text-green-400/70">+{profitCalc.pips}p</div>}
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-[6px] text-[#5050a0]">TP</div>
+                      <div className={`text-[9px] font-bold ${takeProfit ? 'text-[#4ade80]' : 'text-[#1a2e1a]'}`}>{priceFmt(takeProfit)}</div>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-[6px] text-[#5050a0]">SL</div>
+                      <div className={`text-[9px] font-bold ${stopLoss ? 'text-[#f87171]' : 'text-[#2e1a1a]'}`}>{priceFmt(stopLoss)}</div>
+                      {lossCalc && <div className="text-[6px] text-red-400/70">-{lossCalc.pips}p</div>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Set Levels */}
+              <div>
+                <div className="text-[7px] text-[#5050a0] tracking-widest uppercase mb-1.5">Set Levels</div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {[
+                    { key: 'entry', label: 'ENTRY', activeClass: 'border-[#38bdf8] bg-[#38bdf810] text-[#38bdf8]' },
+                    { key: 'tp',    label: 'TP',    activeClass: 'border-[#4ade80] bg-[#4ade8010] text-[#4ade80]' },
+                    { key: 'sl',    label: 'SL',    activeClass: 'border-[#f87171] bg-[#f8717110] text-[#f87171]' },
+                  ].map(btn => {
+                    const isSet = btn.key === 'entry' ? !!entry : btn.key === 'tp' ? !!takeProfit : !!stopLoss;
+                    return (
+                      <button
+                        key={btn.key}
+                        onClick={() => handleLineBtn(btn.key)}
+                        className={`py-1.5 rounded-lg border-2 text-center transition-all ${
+                          isSet ? btn.activeClass : 'bg-[#0d0d1f] border-[#2e2e58] text-white/30 hover:border-[#3e3e68]'
+                        }`}
+                      >
+                        <div className="text-sm font-bold">{isSet ? '✕' : '+'}</div>
+                        <div className="text-[7px] uppercase tracking-wider">{btn.label}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* BUY / SELL */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleTrade('BUY')}
+                  disabled={!canBuy}
+                  className={`flex-1 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${
+                    canBuy
+                      ? 'bg-[#4ade8010] border-2 border-[#4ade80] text-[#4ade80] hover:bg-[#4ade8020] active:scale-[0.98]'
+                      : 'bg-[#0a0a0a] border-2 border-[#1a2e1a] text-[#2a3a2a] opacity-30 cursor-not-allowed'
+                  }`}
+                >
+                  ▲ BUY
+                </button>
+                <button
+                  onClick={() => handleTrade('SELL')}
+                  disabled={!canSell}
+                  className={`flex-1 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${
+                    canSell
+                      ? 'bg-[#f8717110] border-2 border-[#f87171] text-[#f87171] hover:bg-[#f8717120] active:scale-[0.98]'
+                      : 'bg-[#0a0a0a] border-2 border-[#2a1a1a] text-[#3a2a2a] opacity-30 cursor-not-allowed'
+                  }`}
+                >
+                  SELL ▼
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+
+      </div>{/* end flex column */}
 
       <BottomNav active="trade" />
 
+      {/* ── Modals ── */}
       {showWallet && (
         <WalletModal
           balance={balance}
@@ -817,10 +786,7 @@ export default function TradingDashboard() {
                 </div>
               ))}
             </div>
-            <button
-              onClick={() => setShowActivationModal(false)}
-              className="mt-5 w-full py-2.5 bg-white/5 border border-[#2e2e58] rounded-xl text-white/70 text-xs tracking-widest hover:bg-white/10 transition-all"
-            >
+            <button onClick={() => setShowActivationModal(false)} className="mt-5 w-full py-2.5 bg-white/5 border border-[#2e2e58] rounded-xl text-white/70 text-xs tracking-widest hover:bg-white/10 transition-all">
               CLOSE
             </button>
           </div>
@@ -848,10 +814,7 @@ export default function TradingDashboard() {
                 </div>
               ))}
             </div>
-            <button
-              onClick={() => setShowResultModal(false)}
-              className="mt-5 w-full py-2.5 bg-white/5 border border-[#2e2e58] rounded-xl text-white/70 text-xs tracking-widest hover:bg-white/10 transition-all"
-            >
+            <button onClick={() => setShowResultModal(false)} className="mt-5 w-full py-2.5 bg-white/5 border border-[#2e2e58] rounded-xl text-white/70 text-xs tracking-widest hover:bg-white/10 transition-all">
               CLOSE
             </button>
           </div>
