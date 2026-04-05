@@ -12,7 +12,6 @@ import os
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Create tables
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     
@@ -21,13 +20,12 @@ async def lifespan(app: FastAPI):
     
     yield
     
-    # Cleanup
     worker_task.cancel()
 
 
 app = FastAPI(title="eQual Arbitrage Service", version="1.0.0", lifespan=lifespan)
 
-origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5170").split(",")
+origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5170,http://localhost:5171,http://localhost:5172,http://localhost:5173,http://localhost:5174,http://localhost:5175,http://localhost:5176").split(",")
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,7 +49,9 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
     await manager.connect(websocket, user_id)
     try:
         while True:
-            # Keep connection alive
-            await websocket.receive_text()
+            # Keep connection alive with ping/pong
+            data = await websocket.receive_text()
+            if data == "ping":
+                await websocket.send_text("pong")
     except WebSocketDisconnect:
         manager.disconnect(websocket, user_id)

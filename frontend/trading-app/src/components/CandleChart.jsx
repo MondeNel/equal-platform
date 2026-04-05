@@ -23,7 +23,7 @@ export default function CandleChart({
   onTPChange,
   onSLChange,
   isTradeActive = false,
-  showControls = false,   // kept in props for API compatibility but no longer used for sizing
+  showControls = false,
   activeTool = 'cursor',
   onToolSelect,
 }) {
@@ -55,18 +55,14 @@ export default function CandleChart({
     if (!userScrolled) setOffset(maxOffset);
   }, [maxOffset, userScrolled]);
 
-  useEffect(() => { setOffset(maxOffset); }, []); // eslint-disable-line
+  useEffect(() => { setOffset(maxOffset); }, []);
 
-  // ── KEY FIX: size canvas to fill its container div, not window.innerHeight ──
-  // The container is a flex-1 child of the chart wrapper, so it naturally takes
-  // whatever space is left after the control panel. ResizeObserver picks up any
-  // size change (including when the panel opens/closes) and redraws the canvas.
   useEffect(() => {
     const measure = () => {
       const el = containerRef.current;
       if (!el) return;
       const w = el.clientWidth;
-      const h = el.clientHeight;   // ← fills parent flex height automatically
+      const h = el.clientHeight;
       if (w > 0 && h > 0) {
         setCanvasSize({ w, h });
       }
@@ -76,7 +72,7 @@ export default function CandleChart({
     if (containerRef.current) ro.observe(containerRef.current);
     window.addEventListener('resize', measure);
     return () => { ro.disconnect(); window.removeEventListener('resize', measure); };
-  }, []); // no showControls dependency needed
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -85,11 +81,11 @@ export default function CandleChart({
     const dpr = window.devicePixelRatio || 1;
     canvas.width = canvasSize.w * dpr;
     canvas.height = canvasSize.h * dpr;
-    canvas.style.width  = `${canvasSize.w}px`;
+    canvas.style.width = `${canvasSize.w}px`;
     canvas.style.height = `${canvasSize.h}px`;
     drawingCanvas.width = canvasSize.w * dpr;
     drawingCanvas.height = canvasSize.h * dpr;
-    drawingCanvas.style.width  = `${canvasSize.w}px`;
+    drawingCanvas.style.width = `${canvasSize.w}px`;
     drawingCanvas.style.height = `${canvasSize.h}px`;
   }, [canvasSize]);
 
@@ -108,7 +104,7 @@ export default function CandleChart({
       vx: (Math.random() - 0.5) * 2,
       vy: (Math.random() - 0.5) * 2,
       life: 1,
-      color: livePrice > (candles[candles.length - 1]?.close || 18) ? '#4ade80' : '#f87171',
+      color: livePrice > (candles[candles.length - 1]?.close || 18) ? '#28a745' : '#dc3545',
     }));
     setParticles(prev => [...prev, ...newParticles].slice(-50));
   }, [livePrice, canvasSize.w, canvasSize.h, candles]);
@@ -155,7 +151,7 @@ export default function CandleChart({
       const last = { ...next[next.length - 1] };
       last.close = livePrice;
       last.high = Math.max(last.high, livePrice);
-      last.low  = Math.min(last.low,  livePrice);
+      last.low = Math.min(last.low, livePrice);
       next[next.length - 1] = last;
       return next;
     });
@@ -213,13 +209,13 @@ export default function CandleChart({
   };
 
   const getToolColor = (tool) => {
-    const map = { trendline: '#38bdf8', hline: '#facc15', vline: '#facc15', rect: '#f87171', fib: '#4ade80', arc: '#a78bfa', ruler: '#f97316' };
-    return map[tool] || '#ffffff';
+    const map = { trendline: '#007bff', hline: '#f5a623', vline: '#f5a623', rect: '#dc3545', fib: '#28a745', arc: '#6f42c1', ruler: '#fd7e14' };
+    return map[tool] || '#6c757d';
   };
 
   const handleTextInputSubmit = () => {
     if (textInput.value.trim()) {
-      setDrawings(prev => [...prev, { id: Date.now(), type: 'text', position: { x: textInput.x, y: textInput.y }, text: textInput.value, color: '#ffffff' }]);
+      setDrawings(prev => [...prev, { id: Date.now(), type: 'text', position: { x: textInput.x, y: textInput.y }, text: textInput.value, color: '#1a1a2e' }]);
     }
     setTextInput({ visible: false, x: 0, y: 0, value: '' });
     if (onToolSelect) onToolSelect('cursor');
@@ -243,9 +239,9 @@ export default function CandleChart({
     const h = canvasSize.h;
 
     if (!isTradeActive) {
-      if (hitLine(entry, localY, yMin, yRange, h))      { setDraggingLine('entry'); return; }
-      if (hitLine(takeProfit, localY, yMin, yRange, h)) { setDraggingLine('tp');    return; }
-      if (hitLine(stopLoss, localY, yMin, yRange, h))   { setDraggingLine('sl');    return; }
+      if (hitLine(entry, localY, yMin, yRange, h)) { setDraggingLine('entry'); return; }
+      if (hitLine(takeProfit, localY, yMin, yRange, h)) { setDraggingLine('tp'); return; }
+      if (hitLine(stopLoss, localY, yMin, yRange, h)) { setDraggingLine('sl'); return; }
     }
 
     setIsDragging(true);
@@ -269,8 +265,8 @@ export default function CandleChart({
         const dec = (livePrice || 18) > 100 ? 2 : 4;
         const p = parseFloat(price.toFixed(dec));
         if (draggingLine === 'entry') onEntryChange?.(p);
-        if (draggingLine === 'tp')    onTPChange?.(p);
-        if (draggingLine === 'sl')    onSLChange?.(p);
+        if (draggingLine === 'tp') onTPChange?.(p);
+        if (draggingLine === 'sl') onSLChange?.(p);
       }
       return;
     }
@@ -286,7 +282,7 @@ export default function CandleChart({
     if (isDrawing) finishDrawing();
     setIsDragging(false);
     setDraggingLine(null);
-  }, [isDrawing]); // eslint-disable-line
+  }, [isDrawing]);
 
   const getClientXY = (e) => {
     if (e.touches && e.touches.length > 0) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
@@ -311,7 +307,6 @@ export default function CandleChart({
     };
   }, [handlePointerMove, handlePointerUp]);
 
-  // ── Drawing canvas ────────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = drawingCanvasRef.current;
     if (!canvas) return;
@@ -373,7 +368,6 @@ export default function CandleChart({
     }
   };
 
-  // ── Main chart drawing ────────────────────────────────────────────────────
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || visibleCandles.length === 0) return;
@@ -384,23 +378,27 @@ export default function CandleChart({
     ctx.save();
     ctx.scale(dpr, dpr);
 
-    const gradient = ctx.createLinearGradient(0, 0, 0, h);
-    gradient.addColorStop(0, '#0a0a1e');
-    gradient.addColorStop(1, '#05050e');
-    ctx.fillStyle = gradient;
+    // Light theme background
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, w, h);
 
     const extras = [entry, takeProfit, stopLoss, livePrice].filter(Boolean);
     const { yMin, yRange } = getPriceRange(visibleCandles, extras);
     const toYc = (p) => toY(p, yMin, yRange, h);
 
+    // Grid lines - light gray
     const gridRows = 6;
     for (let i = 0; i <= gridRows; i++) {
       const y = (i / gridRows) * h;
-      ctx.strokeStyle = '#1a1a30'; ctx.lineWidth = 0.5;
+      ctx.strokeStyle = '#e0e4e8';
+      ctx.lineWidth = 0.5;
       ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
     }
-    ctx.fillStyle = '#404080'; ctx.font = '8px monospace'; ctx.textAlign = 'right';
+    
+    // Price labels - dark gray
+    ctx.fillStyle = '#6c757d';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'right';
     for (let i = 0; i <= gridRows; i++) {
       const price = yMin + (i / gridRows) * yRange;
       ctx.fillText(price.toFixed(4), w - 4, toYc(price) - 2);
@@ -412,8 +410,9 @@ export default function CandleChart({
     visibleCandles.forEach((c, i) => {
       const x = i * step + step / 2;
       const bull = c.close >= c.open;
-      const color = bull ? '#4ade80' : '#f87171';
-      ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+      const color = bull ? '#28a745' : '#dc3545';
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.moveTo(x, toYc(c.high)); ctx.lineTo(x, toYc(c.low)); ctx.stroke();
       const bodyTop = Math.min(toYc(c.open), toYc(c.close));
       const bodyH = Math.max(1.5, Math.abs(toYc(c.close) - toYc(c.open)));
@@ -421,45 +420,57 @@ export default function CandleChart({
       ctx.fillRect(x - candleW / 2, bodyTop, candleW, bodyH);
     });
 
+    // Live price line - gold
     if (livePrice && livePrice > 0) {
       const py = toYc(livePrice);
       const glowAlpha = 0.2 + 0.1 * Math.sin(pulseIntensity * Math.PI * 2);
-      ctx.strokeStyle = `rgba(250,204,21,${glowAlpha})`; ctx.lineWidth = 4;
+      ctx.strokeStyle = `rgba(245,166,35,${glowAlpha})`;
+      ctx.lineWidth = 4;
       ctx.beginPath(); ctx.setLineDash([6,5]); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
-      ctx.strokeStyle = '#facc15'; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#f5a623';
+      ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.setLineDash([6,5]); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
       ctx.setLineDash([]);
       const label = livePrice.toFixed(4);
       const bW = 60, bH = 16, bX = w - bW - 2, bY = py - bH / 2;
-      ctx.fillStyle = '#facc15'; ctx.beginPath(); ctx.roundRect(bX, bY, bW, bH, 3); ctx.fill();
-      ctx.fillStyle = '#05050e'; ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
-      ctx.fillText(label, bX + bW / 2, bY + 11); ctx.textAlign = 'left';
+      ctx.fillStyle = '#f5a623';
+      ctx.beginPath(); ctx.roundRect(bX, bY, bW, bH, 3); ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, bX + bW / 2, bY + 11);
+      ctx.textAlign = 'left';
     }
 
     const drawLevel = (price, color, label) => {
       if (!price) return;
       const py = toYc(price);
-      ctx.strokeStyle = color + '30'; ctx.lineWidth = 6;
+      ctx.strokeStyle = color + '30';
+      ctx.lineWidth = 6;
       ctx.beginPath(); ctx.setLineDash([5,4]); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
-      ctx.strokeStyle = color; ctx.lineWidth = 1.5;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.setLineDash([5,4]); ctx.moveTo(0, py); ctx.lineTo(w, py); ctx.stroke();
       ctx.setLineDash([]);
       if (!isTradeActive) {
         const hx = w - 22;
-        ctx.beginPath(); ctx.arc(hx, py, 8, 0, Math.PI * 2); ctx.fillStyle = color + '40'; ctx.fill();
+        ctx.beginPath(); ctx.arc(hx, py, 8, 0, Math.PI * 2); ctx.fillStyle = color + '20'; ctx.fill();
         ctx.beginPath(); ctx.arc(hx, py, 6, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
         ctx.beginPath(); ctx.arc(hx, py, 2.5, 0, Math.PI * 2); ctx.fillStyle = '#fff'; ctx.fill();
       }
       const text = `${label}  ${price.toFixed(4)}`;
       const bW = ctx.measureText(text).width + 14, bH = 15;
       const bX = w - bW - 28, bY = py - bH / 2;
-      ctx.fillStyle = color + '22'; ctx.strokeStyle = color;
+      ctx.fillStyle = color + '20';
+      ctx.strokeStyle = color;
       ctx.beginPath(); ctx.roundRect(bX, bY, bW, bH, 3); ctx.fill(); ctx.stroke();
-      ctx.fillStyle = color; ctx.font = 'bold 8px monospace'; ctx.fillText(text, bX + 7, bY + 10);
+      ctx.fillStyle = color;
+      ctx.font = 'bold 8px monospace';
+      ctx.fillText(text, bX + 7, bY + 10);
     };
-    drawLevel(entry, '#38bdf8', 'ENTRY');
-    drawLevel(takeProfit, '#4ade80', 'TP');
-    drawLevel(stopLoss, '#f87171', 'SL');
+    drawLevel(entry, '#007bff', 'ENTRY');
+    drawLevel(takeProfit, '#28a745', 'TP');
+    drawLevel(stopLoss, '#dc3545', 'SL');
 
     particles.forEach(p => {
       ctx.fillStyle = p.color + Math.round(p.life * 100).toString(16).padStart(2, '0');
@@ -475,7 +486,6 @@ export default function CandleChart({
     : (draggingLine ? 'ns-resize' : (isDragging ? 'grabbing' : 'grab'));
 
   return (
-    // ── Fill the parent div completely — parent controls the height ──────────
     <div ref={containerRef} className="relative w-full h-full select-none overflow-hidden">
       <canvas
         ref={canvasRef}
@@ -491,7 +501,7 @@ export default function CandleChart({
         <div className="absolute z-20" style={{ left: textInput.x, top: textInput.y - 20 }}>
           <input
             type="text" autoFocus
-            className="bg-[#0a0a1e] border border-[#38bdf8] rounded px-2 py-1 text-white text-xs font-mono"
+            className="bg-white border border-[#007bff] rounded px-2 py-1 text-[#1a1a2e] text-xs font-mono"
             placeholder="Enter text..."
             value={textInput.value}
             onChange={e => setTextInput(prev => ({ ...prev, value: e.target.value }))}
@@ -503,20 +513,20 @@ export default function CandleChart({
       {!isCentered && (
         <button
           onClick={centerChart}
-          className="absolute top-2 right-2 px-3 py-1.5 bg-gradient-to-br from-[#2a2a50] to-[#1a1a30] border border-[#38bdf8] rounded-md text-[#38bdf8] text-[9px] font-mono hover:shadow-lg hover:shadow-[#38bdf8]/50 transition-all z-10 font-bold uppercase tracking-widest"
+          className="absolute top-2 right-2 px-3 py-1.5 bg-white border border-[#007bff] rounded-md text-[#007bff] text-[9px] font-mono hover:shadow-lg transition-all z-10 font-bold uppercase tracking-widest"
         >
           ⌖ CENTRE
         </button>
       )}
-      <div className="absolute bottom-2 right-2 flex gap-1 items-center z-10 bg-[#0a0a1e]/50 backdrop-blur-sm p-2 rounded-lg border border-[#2e2e58]">
-        <button onClick={() => zoom(-1)} className="w-8 h-8 bg-gradient-to-br from-[#1a1a32] to-[#12122a] border border-[#3a5a8c] rounded-md text-[#38bdf8] font-bold hover:shadow-lg hover:shadow-[#38bdf8]/30 transition-all flex items-center justify-center text-sm">−</button>
-        <div className="px-3 py-1 bg-[#0a0a1e] border border-[#2e2e58] rounded-md text-[#5858a0] text-[8px] min-w-[40px] text-center font-semibold">{Math.round(zoomLevel * 100)}%</div>
-        <button onClick={() => zoom(1)} className="w-8 h-8 bg-gradient-to-br from-[#1a1a32] to-[#12122a] border border-[#3a5a8c] rounded-md text-[#38bdf8] font-bold hover:shadow-lg hover:shadow-[#38bdf8]/30 transition-all flex items-center justify-center text-sm">+</button>
+      <div className="absolute bottom-2 right-2 flex gap-1 items-center z-10 bg-white/80 backdrop-blur-sm p-2 rounded-lg border border-[#e0e4e8]">
+        <button onClick={() => zoom(-1)} className="w-8 h-8 bg-white border border-[#e0e4e8] rounded-md text-[#007bff] font-bold hover:shadow-md transition-all flex items-center justify-center text-sm">−</button>
+        <div className="px-3 py-1 bg-white border border-[#e0e4e8] rounded-md text-[#6c757d] text-[8px] min-w-[40px] text-center font-semibold">{Math.round(zoomLevel * 100)}%</div>
+        <button onClick={() => zoom(1)} className="w-8 h-8 bg-white border border-[#e0e4e8] rounded-md text-[#007bff] font-bold hover:shadow-md transition-all flex items-center justify-center text-sm">+</button>
       </div>
       {drawings.length > 0 && (
         <button
           onClick={() => setDrawings([])}
-          className="absolute bottom-2 left-2 px-2 py-1 bg-[#0a0a1e]/50 border border-[#2e2e58] rounded-md text-[#8888c0] text-[8px] font-mono hover:bg-[#2a2a50] transition-all"
+          className="absolute bottom-2 left-2 px-2 py-1 bg-white/80 border border-[#e0e4e8] rounded-md text-[#6c757d] text-[8px] font-mono hover:bg-[#f8f9fa] transition-all"
         >
           Clear {drawings.length} drawing{drawings.length !== 1 && 's'}
         </button>
